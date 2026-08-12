@@ -24,15 +24,23 @@ async function fetchSymbol(symbol) {
   const price = meta.regularMarketPrice
   const previousClose = meta.previousClose
   const timestamps = result.timestamp ?? []
-  const closesRaw = result.indicators?.quote?.[0]?.close ?? []
+  const quote = result.indicators?.quote?.[0] ?? {}
+  const closesRaw = quote.close ?? []
+  const highsRaw = quote.high ?? []
+  const lowsRaw = quote.low ?? []
 
   if (typeof price !== 'number' || typeof previousClose !== 'number') {
     throw new Error(`Unvollständige Kursdaten für ${symbol}`)
   }
 
   const series = timestamps
-    .map((t, i) => ({ datetime: new Date(t * 1000).toISOString(), close: closesRaw[i] }))
-    .filter((c) => typeof c.close === 'number')
+    .map((t, i) => ({
+      datetime: new Date(t * 1000).toISOString(),
+      close: closesRaw[i],
+      high: highsRaw[i],
+      low: lowsRaw[i],
+    }))
+    .filter((c) => typeof c.close === 'number' && typeof c.high === 'number' && typeof c.low === 'number')
 
   return {
     symbol,

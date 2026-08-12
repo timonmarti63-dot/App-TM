@@ -13,8 +13,12 @@ Keine Anmeldung, kein API-Key, kein eigener Server zum Betreiben – die App bra
 - **Sparten** – frei anlegbare, jederzeit editierbare Liste deiner Business-Versuche
   mit Status (Idee / Im Aufbau / Aktiv / Pausiert / Beendet) und Notizen.
 - **Marktanalyst** – Top-5-Tagesgewinner getrennt für Aktien und Rohstoffe (aus einer
-  festen Beobachtungsliste, siehe unten), inkl. Trend-Prognose bis Handelsschluss
-  heute und in 7 Tagen. Aktualisiert sich automatisch stündlich – **ohne API-Key**.
+  festen Beobachtungsliste, siehe unten) mit echten Preisen in der marktüblichen
+  Einheit (z.B. US-Dollar je Feinunze bei Gold, je Barrel bei Rohöl). Für jeden Titel:
+  Kursziel bis Handelsschluss heute und in 7 Tagen, dazu eine daraus abgeleitete
+  Einstiegszone, ein Stop-Loss und das Chance-Risiko-Verhältnis (CRV) – als Chart mit
+  Einstiegsband/SL/TP-Linien und als Tabelle. Aktualisiert sich automatisch stündlich
+  – **ohne API-Key**.
 
 Zeitplan- und Sparten-Daten liegen lokal im `localStorage` deines Browsers.
 
@@ -61,20 +65,36 @@ Top-5-Tagesgewinner – das ist keine vollständige Marktabdeckung, aber eine
 realistische, verlässliche Annäherung. Die Liste lässt sich in `watchlist.ts` beliebig
 anpassen.
 
-Echte Rohstoffbörsen sind über kostenlose Consumer-Schnittstellen kaum zugänglich.
-Rohstoffe werden deshalb über die liquidesten, börsengehandelten ETFs abgebildet, die
-dem jeweiligen Spotpreis sehr eng folgen: Gold (GLD), Silber (SLV), Rohöl WTI (USO),
-Erdgas (UNG), Kupfer (CPER), Platin (PPLT).
+Rohstoffe werden über die jeweils meistgehandelten **Terminkontrakte (Futures)**
+abgebildet – das sind echte, an der Börse gehandelte Preise in ihrer marktüblichen
+Einheit, kein ETF-Näherungswert: Gold (`GC=F`, USD/Feinunze), Silber (`SI=F`,
+USD/Feinunze), Rohöl WTI (`CL=F`, USD/Barrel), Erdgas (`NG=F`, USD/MMBtu), Kupfer
+(`HG=F`, USD/Pfund), Platin (`PL=F`, USD/Feinunze). Das ist der Preis des aktuell
+nächstfälligen Kontrakts, kein Sofort-Spotpreis – für die tägliche Einordnung macht das
+praktisch keinen Unterschied.
 
-### Wie die Prognose entsteht (wichtig)
+### Wie Prognose, Einstiegszone, Stop-Loss und CRV entstehen (wichtig)
 
-Es gibt keine Methode, die zukünftige Aktienkurse zuverlässig vorhersagt – auch diese
-App tut das nicht. "Prognose bis Handelsschluss" und "Prognose in 7 Tagen" sind eine
-**statistische Fortschreibung des jüngsten Kursmomentums**: eine lineare Regression
-über die letzten ~24-30 Stundenkurse wird in die Zukunft verlängert
-(`src/services/forecast.ts`). Das ist nützlich, um den aktuellen Trend zu sehen – es
-ist **keine Anlageberatung und keine Garantie** für den tatsächlichen Kurs, der von
-Nachrichten, Marktstimmung u.v.m. abhängt, die dieses Modell nicht kennt.
+Es gibt keine Methode, die zukünftige Kurse zuverlässig vorhersagt – auch diese App tut
+das nicht, und nichts davon ist eine Anlageberatung. Alle Werte in `src/services/forecast.ts`
+sind rein statistisch:
+
+- **Kursziel heute / in 7 Tagen**: eine lineare Regression über die letzten ~24-30
+  Stundenkurse, in die Zukunft verlängert (Fortschreibung des jüngsten Kursmomentums).
+- **Einstiegszone**: ein flacher Rücksetzer-Bereich entgegen der jüngsten Kursrichtung,
+  in Höhe der durchschnittlichen Handelsspanne (High-Low) der letzten 24 Kerzen – eine
+  ATR-ähnliche Volatilitätskennzahl.
+- **Stop-Loss**: ein weiterer Abstand jenseits der Einstiegszone, in derselben
+  Volatilitätslogik.
+- **Setup-Richtung (Long/Short)**: Vorzeichen der Regressions-Steigung der letzten
+  Stunden – das kann von der oben gezeigten Tagesveränderung abweichen, wenn ein
+  Titel den Tag zwar im Plus verbringt, der kurzfristige Trend aber gerade dreht.
+- **CRV (Chance-Risiko-Verhältnis)**: Abstand zum Kursziel geteilt durch Abstand zum
+  Stop-Loss.
+
+Reale Kurse hängen von Nachrichten, Marktstimmung u.v.m. ab, die dieses Modell nicht
+kennt – die Zahlen sind eine nachvollziehbare Illustration von Trend und Volatilität,
+keine verlässliche Vorhersage und keine Handelsempfehlung.
 
 ## Projektstruktur
 
@@ -87,15 +107,15 @@ src/
     dashboard/   Übersichtsseite
     timetable/   Zeitplan + Checkliste
     ventures/    Sparten-Verwaltung
-    market/      Marktanalyst (Liste, Sparkline)
+    market/      Marktanalyst (Liste, Chart mit Entry/SL/TP)
     ui.tsx       Wiederverwendbare UI-Bausteine
   services/
     marketData.ts  Client für die eigene /api/quotes-Route
-    forecast.ts     Trend-Prognose (lineare Regression)
+    forecast.ts     Trend-Prognose, Einstiegszone, Stop-Loss, CRV
   hooks/
     useLocalStorage.ts
     useMarketData.ts  Stündliches Auto-Refresh + Top-5-Ranking
-  data/watchlist.ts   Beobachtungsliste Aktien & Rohstoff-ETFs
+  data/watchlist.ts   Beobachtungsliste Aktien & Rohstoff-Futures
   lib/time.ts         US-Handelszeiten, Wochentags-Helfer
 vite.config.ts         Spiegelt api/quotes.js als Dev-Middleware für npm run dev
 ```

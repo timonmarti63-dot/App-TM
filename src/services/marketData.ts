@@ -1,6 +1,8 @@
 export interface Candle {
   datetime: string
   close: number
+  high: number
+  low: number
 }
 
 interface RawQuote {

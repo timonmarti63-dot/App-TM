@@ -25,6 +25,13 @@ export function MarketPage() {
         }
       />
 
+      <Card className="mb-4 bg-[var(--accent-soft)] text-sm text-[var(--text-secondary)]">
+        <strong className="text-[var(--text-primary)]">Kein Anlageberater.</strong> Alle Kursziele, Einstiegszonen,
+        Stop-Loss-Marken und Chance-Risiko-Verhältnisse (CRV) sind automatisch berechnete, statistische Schätzungen
+        auf Basis von Kurstrend und Schwankungsbreite der letzten Handelsstunden – keine Finanzanalyse durch Menschen,
+        keine Empfehlung und keine Garantie für den tatsächlichen Kursverlauf.
+      </Card>
+
       {snapshot.error && (
         <Card className="mb-4 border-[var(--critical)]/40 text-sm text-[var(--critical)]">{snapshot.error}</Card>
       )}
@@ -36,7 +43,7 @@ export function MarketPage() {
         <PerformerSection title="Aktien" subtitle="Top 5 Tagesgewinner aus der Beobachtungsliste" watchlist={STOCK_WATCHLIST} snapshot={snapshot} />
         <PerformerSection
           title="Rohstoffe"
-          subtitle="Top 5 Tagesgewinner (abgebildet über liquide Rohstoff-ETFs)"
+          subtitle="Top 5 Tagesgewinner – echte Terminkontrakt-Preise (Gold, Silber, Öl, Erdgas, Kupfer, Platin)"
           watchlist={COMMODITY_WATCHLIST}
           snapshot={snapshot}
         />

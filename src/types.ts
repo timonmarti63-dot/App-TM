@@ -28,6 +28,8 @@ export interface WatchlistSymbol {
   symbol: string
   name: string
   category: MarketCategory
+  unitLabel: string // z.B. "US-Dollar je Feinunze"
+  unitAbbrev: string // z.B. "/oz"
 }
 
 export interface Quote {
@@ -38,6 +40,8 @@ export interface Quote {
   timestamp: number
 }
 
+export type TradeDirection = 'long' | 'short'
+
 export interface Forecast {
   symbol: string
   currentPrice: number
@@ -46,6 +50,12 @@ export interface Forecast {
   sevenDayEstimate: number
   computedAt: number
   recentCloses: number[]
+  direction: TradeDirection
+  entryLow: number
+  entryHigh: number
+  stopLoss: number
+  riskRewardEod: number | null
+  riskRewardSevenDay: number | null
 }
 
 export interface MarketSnapshot {
