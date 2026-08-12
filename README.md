@@ -12,13 +12,17 @@ Keine Anmeldung, kein API-Key, kein eigener Server zum Betreiben – die App bra
   einmalig, pro Tag abhakbar, Fortschritt wird pro Datum gespeichert.
 - **Sparten** – frei anlegbare, jederzeit editierbare Liste deiner Business-Versuche
   mit Status (Idee / Im Aufbau / Aktiv / Pausiert / Beendet) und Notizen.
-- **Marktanalyst** – Top-5-Tagesgewinner getrennt für Aktien und Rohstoffe (aus einer
-  festen Beobachtungsliste, siehe unten) mit echten Preisen in der marktüblichen
-  Einheit (z.B. US-Dollar je Feinunze bei Gold, je Barrel bei Rohöl). Für jeden Titel:
-  Kursziel bis Handelsschluss heute und in 7 Tagen, dazu eine daraus abgeleitete
-  Einstiegszone, ein Stop-Loss und das Chance-Risiko-Verhältnis (CRV) – als Chart mit
-  Einstiegsband/SL/TP-Linien und als Tabelle. Aktualisiert sich automatisch stündlich
-  – **ohne API-Key**.
+- **Marktanalyst** – dreistufig aufgebaut, **ohne API-Key**:
+  1. **Übersichtstabelle** aller Aktien und Rohstoffe der Beobachtungsliste, sortiert
+     nach Tagesveränderung, mit echten Preisen in der marktüblichen Einheit (z.B.
+     US-Dollar je Feinunze bei Gold, je Barrel bei Rohöl).
+  2. Auf eine Zeile tippen öffnet die **Detailansicht**: Chart mit Kurshistorie,
+     Einstiegszone, Stop-Loss und Take-Profit-Linien, plus Kursziel bis
+     Handelsschluss heute und in 7 Tagen mit Chance-Risiko-Verhältnis (CRV).
+  3. Von dort aus zu **Schlagzeilen & Kurzbericht**: aktuelle Presse-Meldungen mit
+     Original-Link je Titel, dazu eine automatisch aus Kursdaten und Schlagzeilen
+     zusammengestellte Kurzübersicht.
+  Aktualisiert sich automatisch stündlich.
 
 Zeitplan- und Sparten-Daten liegen lokal im `localStorage` deines Browsers.
 
@@ -41,12 +45,18 @@ npm run build
 ## Wie der Marktanalyst ohne API-Key funktioniert
 
 Klassische Finanz-APIs (z.B. Twelve Data, Alpha Vantage) verlangen einen kostenlosen,
-aber selbst anzulegenden Account samt Key. Um das zu vermeiden, holt eine kleine
-**serverlose Funktion** (`api/quotes.js`) die Kursdaten server-seitig von der
-öffentlichen, keyless Chart-API von Yahoo Finance – der Browser sieht nur die eigene
-`/api/quotes`-Route der App, nie Yahoo direkt. Lokal übernimmt beim `npm run dev` eine
-Vite-Middleware (`vite.config.ts`) exakt dieselbe Logik, sodass du auch ohne Deployment
-sofort echte Daten siehst.
+aber selbst anzulegenden Account samt Key. Um das zu vermeiden, holen zwei kleine
+**serverlose Funktionen** die Daten server-seitig von öffentlichen, keyless
+Yahoo-Finance-Endpunkten – der Browser sieht nur die eigenen `/api/quotes`- und
+`/api/news`-Routen der App, nie Yahoo direkt:
+
+- `api/quotes.js` – Kurse, Kurshistorie (High/Low/Close), stündlich für die ganze
+  Beobachtungsliste abgerufen.
+- `api/news.js` – aktuelle Presse-Schlagzeilen samt Link, nur bei Bedarf abgerufen
+  (wenn du in der Detailansicht auf "Schlagzeilen & Kurzbericht" tippst).
+
+Lokal übernimmt beim `npm run dev` eine Vite-Middleware (`vite.config.ts`) exakt
+dieselbe Logik, sodass du auch ohne Deployment sofort echte Daten siehst.
 
 **Wichtig für den Betrieb:** Diese Yahoo-Finance-Schnittstelle ist inoffiziell und nicht
 dokumentiert – sie wird von vielen Open-Source-Finanztools genutzt, kann sich aber
@@ -96,26 +106,41 @@ Reale Kurse hängen von Nachrichten, Marktstimmung u.v.m. ab, die dieses Modell 
 kennt – die Zahlen sind eine nachvollziehbare Illustration von Trend und Volatilität,
 keine verlässliche Vorhersage und keine Handelsempfehlung.
 
+### Schlagzeilen & Kurzbericht
+
+Die Detailansicht eines Titels bietet einen Button zu "Schlagzeilen & Kurzbericht":
+aktuelle Presse-Meldungen (Titel, Quelle, Original-Link, Alter) über die
+Yahoo-Finance-Such-API, gefiltert auf den jeweiligen Ticker. Die "Automatische
+Kurzübersicht" darüber ist **kein von einem Menschen oder einer KI geschriebener
+Analysebericht**, sondern ein regelbasiert aus Kursdaten und den Schlagzeilen-Titeln
+zusammengesetzter Textblock (`src/lib/report.ts`) – transparent gekennzeichnet als das,
+was er ist.
+
 ## Projektstruktur
 
 ```
 api/
   quotes.js       Serverlose Function (Vercel) – Kursdaten ohne API-Key
-  _lib/yahoo.js    Fetch- & Parse-Logik für die Yahoo-Finance-Chart-API
+  news.js          Serverlose Function (Vercel) – Schlagzeilen ohne API-Key
+  _lib/yahoo.js    Fetch- & Parse-Logik für beide Yahoo-Finance-Endpunkte
 src/
   components/
     dashboard/   Übersichtsseite
     timetable/   Zeitplan + Checkliste
     ventures/    Sparten-Verwaltung
-    market/      Marktanalyst (Liste, Chart mit Entry/SL/TP)
+    market/      Marktanalyst: SymbolTable (Liste) → SymbolDetail (Chart/Setup)
+                 → SymbolNews (Schlagzeilen/Bericht)
     ui.tsx       Wiederverwendbare UI-Bausteine
   services/
     marketData.ts  Client für die eigene /api/quotes-Route
+    newsData.ts     Client für die eigene /api/news-Route
     forecast.ts     Trend-Prognose, Einstiegszone, Stop-Loss, CRV
   hooks/
     useLocalStorage.ts
-    useMarketData.ts  Stündliches Auto-Refresh + Top-5-Ranking
+    useMarketData.ts  Stündliches Auto-Refresh + Performance-Ranking
   data/watchlist.ts   Beobachtungsliste Aktien & Rohstoff-Futures
-  lib/time.ts         US-Handelszeiten, Wochentags-Helfer
-vite.config.ts         Spiegelt api/quotes.js als Dev-Middleware für npm run dev
+  lib/
+    time.ts     US-Handelszeiten, Wochentags-Helfer, relative Zeitangaben
+    report.ts    Regelbasierter Kurzbericht-Text
+vite.config.ts    Spiegelt api/quotes.js + api/news.js als Dev-Middleware
 ```

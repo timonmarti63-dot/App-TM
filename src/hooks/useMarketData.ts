@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ALL_WATCHLIST, COMMODITY_WATCHLIST, STOCK_WATCHLIST } from '../data/watchlist'
+import { ALL_WATCHLIST } from '../data/watchlist'
 import type { MarketSnapshot, Quote, WatchlistSymbol } from '../types'
 import { fetchQuotesWithSeries } from '../services/marketData'
 import { computeForecast } from '../services/forecast'
@@ -10,12 +10,16 @@ const TOP_N = 5
 
 const EMPTY_SNAPSHOT: MarketSnapshot = { quotes: {}, forecasts: {}, fetchedAt: null, error: null }
 
-export function rankTopPerformers(list: WatchlistSymbol[], quotes: Record<string, Quote>) {
+/** Alle Symbole der Liste, absteigend nach Tagesveränderung sortiert. */
+export function sortByPerformance(list: WatchlistSymbol[], quotes: Record<string, Quote>) {
   return list
     .filter((w) => quotes[w.symbol])
     .sort((a, b) => quotes[b.symbol].changePercent - quotes[a.symbol].changePercent)
-    .slice(0, TOP_N)
     .map((w) => w.symbol)
+}
+
+export function rankTopPerformers(list: WatchlistSymbol[], quotes: Record<string, Quote>) {
+  return sortByPerformance(list, quotes).slice(0, TOP_N)
 }
 
 export function useMarketData() {
@@ -42,11 +46,12 @@ export function useMarketData() {
         }
       }
 
-      const topSymbols = [...rankTopPerformers(STOCK_WATCHLIST, quotes), ...rankTopPerformers(COMMODITY_WATCHLIST, quotes)]
-
+      // Die Kurshistorie ist ohnehin schon für alle Symbole geladen (ein Request je
+      // Symbol server-seitig) – die Regression selbst ist reine Client-Arithmetik,
+      // daher lohnt sich hier keine Beschränkung mehr auf eine Top-N-Auswahl.
       const forecasts: MarketSnapshot['forecasts'] = {}
-      for (const symbol of topSymbols) {
-        const forecast = computeForecast(symbol, results[symbol]?.series ?? [])
+      for (const [symbol, r] of Object.entries(results)) {
+        const forecast = computeForecast(symbol, r.series)
         if (forecast) forecasts[symbol] = forecast
       }
 

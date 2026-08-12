@@ -1,4 +1,5 @@
 const CHART_URL = 'https://query2.finance.yahoo.com/v8/finance/chart/'
+const SEARCH_URL = 'https://query1.finance.yahoo.com/v1/finance/search'
 const USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36'
 const CONCURRENCY = 6
@@ -76,4 +77,26 @@ export async function fetchQuotes(symbols) {
     if (r && !r.error) quotes[r.symbol] = r
   }
   return quotes
+}
+
+/**
+ * Dieselbe keyless Yahoo-Finance-Infrastruktur bietet auch eine Such-API, die neben
+ * Kurs-Treffern aktuelle Presse-Schlagzeilen mit Original-Link liefert. Suche direkt
+ * nach dem Ticker (statt nach dem Namen) trifft die relevantesten Artikel.
+ */
+export async function fetchNews(symbol, count = 8) {
+  const url = `${SEARCH_URL}?q=${encodeURIComponent(symbol)}&newsCount=${count}&quotesCount=0`
+  const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' } })
+  if (!res.ok) throw new Error(`Yahoo-News HTTP ${res.status} für ${symbol}`)
+  const payload = await res.json()
+  const items = payload?.news ?? []
+  return items
+    .filter((n) => n.title && n.link)
+    .map((n) => ({
+      title: n.title,
+      publisher: n.publisher ?? 'Unbekannte Quelle',
+      link: n.link,
+      publishedAt: (n.providerPublishTime ?? 0) * 1000,
+    }))
+    .slice(0, count)
 }

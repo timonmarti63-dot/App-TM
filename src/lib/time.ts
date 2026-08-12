@@ -29,6 +29,17 @@ export function isoDate(date: Date): string {
   return date.toISOString().slice(0, 10)
 }
 
+export function formatRelativeTime(timestampMs: number, now: number = Date.now()): string {
+  if (!timestampMs) return ''
+  const diffMinutes = Math.max(0, Math.round((now - timestampMs) / 60000))
+  if (diffMinutes < 1) return 'gerade eben'
+  if (diffMinutes < 60) return `vor ${diffMinutes} Min.`
+  const diffHours = Math.round(diffMinutes / 60)
+  if (diffHours < 24) return `vor ${diffHours} Std.`
+  const diffDays = Math.round(diffHours / 24)
+  return `vor ${diffDays} Tag${diffDays === 1 ? '' : 'en'}`
+}
+
 /**
  * US-Handelszeiten (NYSE, 9:30-16:00 America/New_York), Mo-Fr.
  * Feiertage werden nicht berücksichtigt (kann an echten Feiertagen leicht abweichen).

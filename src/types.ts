@@ -58,6 +58,13 @@ export interface Forecast {
   riskRewardSevenDay: number | null
 }
 
+export interface NewsItem {
+  title: string
+  publisher: string
+  link: string
+  publishedAt: number
+}
+
 export interface MarketSnapshot {
   quotes: Record<string, Quote>
   forecasts: Record<string, Forecast>
