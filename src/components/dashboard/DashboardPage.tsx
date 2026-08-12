@@ -1,7 +1,6 @@
 import type { TimetableEntry, Venture, VentureStatus } from '../../types'
 import { useLocalStorage } from '../../hooks/useLocalStorage'
-import { useMarketData } from '../../hooks/useMarketData'
-import { rankTopPerformers } from '../../hooks/useMarketData'
+import { rankTopPerformers, useMarketData } from '../../hooks/useMarketData'
 import { STOCK_WATCHLIST, COMMODITY_WATCHLIST, ALL_WATCHLIST } from '../../data/watchlist'
 import { isoDate, toAppWeekday } from '../../lib/time'
 import { formatPercent } from '../../lib/format'
@@ -18,8 +17,7 @@ const STATUS_LABEL: Record<VentureStatus, string> = {
 export function DashboardPage({ onNavigate }: { onNavigate: (tab: string) => void }) {
   const [entries] = useLocalStorage<TimetableEntry[]>('mc-timetable', [])
   const [ventures] = useLocalStorage<Venture[]>('mc-ventures', [])
-  const [apiKey] = useLocalStorage('mc-api-key', '')
-  const { snapshot } = useMarketData(apiKey)
+  const { snapshot } = useMarketData()
 
   const today = new Date()
   const todayISO = isoDate(today)
@@ -30,12 +28,10 @@ export function DashboardPage({ onNavigate }: { onNavigate: (tab: string) => voi
   const doneCount = todayEntries.filter((e) => e.completedDates[todayISO]).length
 
   const activeVentures = ventures.filter((v) => v.status === 'aktiv' || v.status === 'aufbau')
-  const topGainer = apiKey
-    ? [...rankTopPerformers(STOCK_WATCHLIST, snapshot.quotes), ...rankTopPerformers(COMMODITY_WATCHLIST, snapshot.quotes)]
-        .map((s) => snapshot.quotes[s])
-        .filter(Boolean)
-        .sort((a, b) => b.changePercent - a.changePercent)[0]
-    : undefined
+  const topGainer = [...rankTopPerformers(STOCK_WATCHLIST, snapshot.quotes), ...rankTopPerformers(COMMODITY_WATCHLIST, snapshot.quotes)]
+    .map((s) => snapshot.quotes[s])
+    .filter(Boolean)
+    .sort((a, b) => b.changePercent - a.changePercent)[0]
   const topGainerMeta = topGainer ? ALL_WATCHLIST.find((w) => w.symbol === topGainer.symbol) : undefined
 
   return (
@@ -64,7 +60,7 @@ export function DashboardPage({ onNavigate }: { onNavigate: (tab: string) => voi
               <Badge tone={topGainer.changePercent >= 0 ? 'good' : 'critical'}>{formatPercent(topGainer.changePercent)}</Badge>
             </>
           ) : (
-            <p className="text-sm text-[var(--text-secondary)]">{apiKey ? 'Lädt…' : 'API-Key im Marktanalyst hinterlegen'}</p>
+            <p className="text-sm text-[var(--text-secondary)]">Lädt…</p>
           )}
         </Card>
       </div>

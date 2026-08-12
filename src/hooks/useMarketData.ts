@@ -1,19 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ALL_WATCHLIST, COMMODITY_WATCHLIST, STOCK_WATCHLIST } from '../data/watchlist'
-import type { WatchlistSymbol } from '../types'
-import { fetchHourlySeries, fetchQuotes } from '../services/marketData'
+import type { MarketSnapshot, Quote, WatchlistSymbol } from '../types'
+import { fetchQuotesWithSeries } from '../services/marketData'
 import { computeForecast } from '../services/forecast'
 import { useLocalStorage } from './useLocalStorage'
-import type { MarketSnapshot } from '../types'
 
 const REFRESH_INTERVAL_MS = 60 * 60 * 1000
 const TOP_N = 5
 
 const EMPTY_SNAPSHOT: MarketSnapshot = { quotes: {}, forecasts: {}, fetchedAt: null, error: null }
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
-
-export function rankTopPerformers(list: WatchlistSymbol[], quotes: MarketSnapshot['quotes']) {
+export function rankTopPerformers(list: WatchlistSymbol[], quotes: Record<string, Quote>) {
   return list
     .filter((w) => quotes[w.symbol])
     .sort((a, b) => quotes[b.symbol].changePercent - quotes[a.symbol].changePercent)
@@ -21,31 +18,36 @@ export function rankTopPerformers(list: WatchlistSymbol[], quotes: MarketSnapsho
     .map((w) => w.symbol)
 }
 
-export function useMarketData(apiKey: string) {
+export function useMarketData() {
   const [snapshot, setSnapshot] = useLocalStorage<MarketSnapshot>('mc-market-snapshot', EMPTY_SNAPSHOT)
   const [loading, setLoading] = useState(false)
   const inFlight = useRef(false)
 
   const refresh = useCallback(async () => {
-    if (!apiKey || inFlight.current) return
+    if (inFlight.current) return
     inFlight.current = true
     setLoading(true)
     try {
       const symbols = ALL_WATCHLIST.map((w) => w.symbol)
-      const quotes = await fetchQuotes(symbols, apiKey)
+      const results = await fetchQuotesWithSeries(symbols)
+
+      const quotes: Record<string, Quote> = {}
+      for (const [symbol, r] of Object.entries(results)) {
+        quotes[symbol] = {
+          symbol,
+          price: r.price,
+          previousClose: r.previousClose,
+          changePercent: r.changePercent,
+          timestamp: r.timestamp,
+        }
+      }
 
       const topSymbols = [...rankTopPerformers(STOCK_WATCHLIST, quotes), ...rankTopPerformers(COMMODITY_WATCHLIST, quotes)]
 
       const forecasts: MarketSnapshot['forecasts'] = {}
       for (const symbol of topSymbols) {
-        try {
-          const series = await fetchHourlySeries(symbol, apiKey)
-          const forecast = computeForecast(symbol, series)
-          if (forecast) forecasts[symbol] = forecast
-        } catch {
-          // Ein einzelnes fehlgeschlagenes Symbol soll den restlichen Refresh nicht abbrechen.
-        }
-        await sleep(250) // schont das Rate-Limit der kostenlosen API-Stufe
+        const forecast = computeForecast(symbol, results[symbol]?.series ?? [])
+        if (forecast) forecasts[symbol] = forecast
       }
 
       setSnapshot({ quotes, forecasts, fetchedAt: Date.now(), error: null })
@@ -55,17 +57,16 @@ export function useMarketData(apiKey: string) {
       inFlight.current = false
       setLoading(false)
     }
-  }, [apiKey, setSnapshot])
+  }, [setSnapshot])
 
   useEffect(() => {
-    if (!apiKey) return
     const stale = !snapshot.fetchedAt || Date.now() - snapshot.fetchedAt > REFRESH_INTERVAL_MS
     if (stale) refresh()
     const interval = setInterval(refresh, REFRESH_INTERVAL_MS)
     return () => clearInterval(interval)
-    // Bewusst nur an apiKey gekoppelt: refresh() soll nicht bei jeder Snapshot-Änderung neu getriggert werden.
+    // Nur einmalig beim Mount einrichten, nicht bei jeder Snapshot-Änderung neu.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apiKey])
+  }, [])
 
   return { snapshot, loading, refresh }
 }
