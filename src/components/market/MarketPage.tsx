@@ -1,40 +1,54 @@
 import { useState } from 'react'
 import { useMarketData } from '../../hooks/useMarketData'
+import { useSymbolNews } from '../../hooks/useSymbolNews'
 import { ALL_WATCHLIST, STOCK_WATCHLIST, COMMODITY_WATCHLIST } from '../../data/watchlist'
 import { Button, Card, SectionHeading } from '../ui'
 import { SymbolTable } from './SymbolTable'
-import { SymbolDetail } from './SymbolDetail'
-import { SymbolNews } from './SymbolNews'
+import { SymbolPreview } from './SymbolPreview'
+import { SymbolFull } from './SymbolFull'
 
-type View = 'list' | 'detail' | 'news'
+type View = 'list' | 'preview' | 'full'
 
 export function MarketPage() {
   const { snapshot, loading, refresh } = useMarketData()
   const [view, setView] = useState<View>('list')
   const [activeSymbol, setActiveSymbol] = useState<string | null>(null)
+  const news = useSymbolNews(activeSymbol)
 
   const meta = activeSymbol ? ALL_WATCHLIST.find((w) => w.symbol === activeSymbol) : undefined
 
   if (view !== 'list' && activeSymbol && meta) {
-    if (view === 'detail') {
+    if (view === 'preview') {
       return (
-        <SymbolDetail
+        <SymbolPreview
           symbol={activeSymbol}
           meta={meta}
           snapshot={snapshot}
+          news={news.items}
+          newsLoading={news.loading}
           onBack={() => setView('list')}
-          onShowNews={() => setView('news')}
+          onShowFull={() => setView('full')}
         />
       )
     }
-    return <SymbolNews symbol={activeSymbol} meta={meta} snapshot={snapshot} onBack={() => setView('detail')} />
+    return (
+      <SymbolFull
+        symbol={activeSymbol}
+        meta={meta}
+        snapshot={snapshot}
+        news={news.items}
+        newsLoading={news.loading}
+        newsError={news.error}
+        onBack={() => setView('preview')}
+      />
+    )
   }
 
   return (
     <div>
       <SectionHeading
         title="Marktanalyst"
-        subtitle="Rohstoffe & Aktien – auf eine Zeile tippen für Chart, Trade-Setup, Schlagzeilen und Kurzbericht"
+        subtitle="Top 5 Aktien & Rohstoffe – auf eine Zeile tippen für Chart, Prognose und Schlagzeile"
         action={
           <div className="flex items-center gap-2">
             {snapshot.fetchedAt && (
@@ -65,22 +79,22 @@ export function MarketPage() {
       <div className="flex flex-col gap-8">
         <SymbolTable
           title="Aktien"
-          subtitle="Alle Titel der Beobachtungsliste, sortiert nach Tagesveränderung"
+          subtitle="Top 5 Tagesgewinner aus der Beobachtungsliste"
           watchlist={STOCK_WATCHLIST}
           snapshot={snapshot}
           onSelect={(symbol) => {
             setActiveSymbol(symbol)
-            setView('detail')
+            setView('preview')
           }}
         />
         <SymbolTable
           title="Rohstoffe"
-          subtitle="Echte Terminkontrakt-Preise (Gold, Silber, Öl, Erdgas, Kupfer, Platin)"
+          subtitle="Top 5 Tagesgewinner – echte Terminkontrakt-Preise (Gold, Silber, Öl, Erdgas, Kupfer, Platin)"
           watchlist={COMMODITY_WATCHLIST}
           snapshot={snapshot}
           onSelect={(symbol) => {
             setActiveSymbol(symbol)
-            setView('detail')
+            setView('preview')
           }}
         />
       </div>

@@ -1,11 +1,19 @@
 import { Line, LineChart, ReferenceArea, ReferenceLine, ResponsiveContainer, Tooltip, YAxis } from 'recharts'
 import type { Forecast } from '../../types'
 
-export function PriceChart({ forecast, unitAbbrev }: { forecast: Forecast; unitAbbrev: string }) {
+export function PriceChart({
+  forecast,
+  unitAbbrev,
+  variant = 'full',
+}: {
+  forecast: Forecast
+  unitAbbrev: string
+  variant?: 'simple' | 'full'
+}) {
   const { recentCloses, entryLow, entryHigh, stopLoss, endOfDayEstimate, sevenDayEstimate } = forecast
   const data = recentCloses.map((close, i) => ({ i, close }))
 
-  const allValues = [...recentCloses, entryLow, entryHigh, stopLoss, endOfDayEstimate, sevenDayEstimate]
+  const allValues = variant === 'full' ? [...recentCloses, entryLow, entryHigh, stopLoss, endOfDayEstimate, sevenDayEstimate] : recentCloses
   const min = Math.min(...allValues)
   const max = Math.max(...allValues)
   const pad = (max - min) * 0.12 || Math.abs(min) * 0.01 || 1
@@ -28,10 +36,14 @@ export function PriceChart({ forecast, unitAbbrev }: { forecast: Forecast; unitA
             }}
           />
 
-          <ReferenceArea y1={entryLow} y2={entryHigh} fill="var(--accent)" fillOpacity={0.14} strokeOpacity={0} />
-          <ReferenceLine y={stopLoss} stroke="var(--critical)" strokeDasharray="4 4" strokeWidth={1.5} />
-          <ReferenceLine y={endOfDayEstimate} stroke="var(--good)" strokeDasharray="4 4" strokeWidth={1.5} />
-          <ReferenceLine y={sevenDayEstimate} stroke="var(--good)" strokeDasharray="2 3" strokeWidth={1.5} />
+          {variant === 'full' && (
+            <>
+              <ReferenceArea y1={entryLow} y2={entryHigh} fill="var(--accent)" fillOpacity={0.14} strokeOpacity={0} />
+              <ReferenceLine y={stopLoss} stroke="var(--critical)" strokeDasharray="4 4" strokeWidth={1.5} />
+              <ReferenceLine y={endOfDayEstimate} stroke="var(--good)" strokeDasharray="4 4" strokeWidth={1.5} />
+              <ReferenceLine y={sevenDayEstimate} stroke="var(--good)" strokeDasharray="2 3" strokeWidth={1.5} />
+            </>
+          )}
 
           <Line type="monotone" dataKey="close" stroke="var(--accent)" strokeWidth={2} dot={false} isAnimationActive={false} />
         </LineChart>

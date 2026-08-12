@@ -1,5 +1,5 @@
 import type { MarketSnapshot, WatchlistSymbol } from '../../types'
-import { sortByPerformance } from '../../hooks/useMarketData'
+import { rankTopPerformers } from '../../hooks/useMarketData'
 import { formatCurrency, formatPercent } from '../../lib/format'
 import { Card, SectionHeading } from '../ui'
 
@@ -16,7 +16,7 @@ export function SymbolTable({
   snapshot: MarketSnapshot
   onSelect: (symbol: string) => void
 }) {
-  const sorted = sortByPerformance(watchlist, snapshot.quotes)
+  const sorted = rankTopPerformers(watchlist, snapshot.quotes)
   const bySymbol = Object.fromEntries(watchlist.map((w) => [w.symbol, w]))
 
   return (

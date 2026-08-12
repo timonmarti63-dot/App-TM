@@ -13,15 +13,16 @@ Keine Anmeldung, kein API-Key, kein eigener Server zum Betreiben – die App bra
 - **Sparten** – frei anlegbare, jederzeit editierbare Liste deiner Business-Versuche
   mit Status (Idee / Im Aufbau / Aktiv / Pausiert / Beendet) und Notizen.
 - **Marktanalyst** – dreistufig aufgebaut, **ohne API-Key**:
-  1. **Übersichtstabelle** aller Aktien und Rohstoffe der Beobachtungsliste, sortiert
-     nach Tagesveränderung, mit echten Preisen in der marktüblichen Einheit (z.B.
-     US-Dollar je Feinunze bei Gold, je Barrel bei Rohöl).
-  2. Auf eine Zeile tippen öffnet die **Detailansicht**: Chart mit Kurshistorie,
-     Einstiegszone, Stop-Loss und Take-Profit-Linien, plus Kursziel bis
-     Handelsschluss heute und in 7 Tagen mit Chance-Risiko-Verhältnis (CRV).
-  3. Von dort aus zu **Schlagzeilen & Kurzbericht**: aktuelle Presse-Meldungen mit
-     Original-Link je Titel, dazu eine automatisch aus Kursdaten und Schlagzeilen
-     zusammengestellte Kurzübersicht.
+  1. **Übersichtstabelle**: Top 5 Tagesgewinner bei Aktien und bei Rohstoffen, nur
+     Name, Preis in der marktüblichen Einheit (z.B. US-Dollar je Feinunze bei Gold,
+     je Barrel bei Rohöl) und Tagesveränderung als Zahl.
+  2. Auf eine Zeile tippen öffnet die **Kurzansicht**: einfacher Kursverlauf-Chart,
+     Kursziel bis Handelsschluss heute und in 7 Tagen, plus die neueste Schlagzeile.
+  3. Nochmal tippen öffnet die **Vollansicht**: Chart mit eingezeichneter
+     Einstiegszone, Stop-Loss und Take-Profit-Linien samt Chance-Risiko-Verhältnis
+     (CRV), dazu alle Schlagzeilen der letzten 2 Tage mit Original-Link und eine
+     automatisch zusammengestellte deutsche Kurzfassung, worüber die Presse zuletzt
+     berichtet hat.
   Aktualisiert sich automatisch stündlich.
 
 Zeitplan- und Sparten-Daten liegen lokal im `localStorage` deines Browsers.
@@ -52,8 +53,8 @@ Yahoo-Finance-Endpunkten – der Browser sieht nur die eigenen `/api/quotes`- un
 
 - `api/quotes.js` – Kurse, Kurshistorie (High/Low/Close), stündlich für die ganze
   Beobachtungsliste abgerufen.
-- `api/news.js` – aktuelle Presse-Schlagzeilen samt Link, nur bei Bedarf abgerufen
-  (wenn du in der Detailansicht auf "Schlagzeilen & Kurzbericht" tippst).
+- `api/news.js` – aktuelle Presse-Schlagzeilen samt Link, wird geladen sobald du in
+  der Übersicht einen Titel antippst, und für Kurz- wie Vollansicht wiederverwendet.
 
 Lokal übernimmt beim `npm run dev` eine Vite-Middleware (`vite.config.ts`) exakt
 dieselbe Logik, sodass du auch ohne Deployment sofort echte Daten siehst.
@@ -106,15 +107,17 @@ Reale Kurse hängen von Nachrichten, Marktstimmung u.v.m. ab, die dieses Modell 
 kennt – die Zahlen sind eine nachvollziehbare Illustration von Trend und Volatilität,
 keine verlässliche Vorhersage und keine Handelsempfehlung.
 
-### Schlagzeilen & Kurzbericht
+### Schlagzeilen & Zusammenfassung
 
-Die Detailansicht eines Titels bietet einen Button zu "Schlagzeilen & Kurzbericht":
-aktuelle Presse-Meldungen (Titel, Quelle, Original-Link, Alter) über die
-Yahoo-Finance-Such-API, gefiltert auf den jeweiligen Ticker. Die "Automatische
-Kurzübersicht" darüber ist **kein von einem Menschen oder einer KI geschriebener
-Analysebericht**, sondern ein regelbasiert aus Kursdaten und den Schlagzeilen-Titeln
-zusammengesetzter Textblock (`src/lib/report.ts`) – transparent gekennzeichnet als das,
-was er ist.
+Die Kurzansicht zeigt bereits die neueste Schlagzeile als Teaser; die Vollansicht
+listet alle Meldungen der letzten 48 Stunden (Titel, Quelle, Original-Link, Alter)
+über die Yahoo-Finance-Such-API, gefiltert auf den jeweiligen Ticker – gibt es keine
+so aktuellen, zeigt sie stattdessen die neuesten verfügbaren mit entsprechendem
+Hinweis. Die "Zusammenfassung" darüber ist **kein von einem Menschen oder einer KI
+geschriebener Analysebericht**, sondern ein regelbasiert aus den Schlagzeilen-Titeln
+zusammengesetzter Textblock (`src/lib/report.ts`, `buildHeadlineSummary`) –
+transparent als das gekennzeichnet, was er ist: eine Bündelung der Titel, keine
+inhaltliche Einordnung.
 
 ## Projektstruktur
 
@@ -128,8 +131,9 @@ src/
     dashboard/   Übersichtsseite
     timetable/   Zeitplan + Checkliste
     ventures/    Sparten-Verwaltung
-    market/      Marktanalyst: SymbolTable (Liste) → SymbolDetail (Chart/Setup)
-                 → SymbolNews (Schlagzeilen/Bericht)
+    market/      Marktanalyst: SymbolTable (Top-5-Liste) → SymbolPreview
+                 (einfacher Chart+Prognose+1 Schlagzeile) → SymbolFull
+                 (Chart mit SL/TP + 2-Tage-News + Zusammenfassung)
     ui.tsx       Wiederverwendbare UI-Bausteine
   services/
     marketData.ts  Client für die eigene /api/quotes-Route
@@ -138,9 +142,10 @@ src/
   hooks/
     useLocalStorage.ts
     useMarketData.ts  Stündliches Auto-Refresh + Performance-Ranking
+    useSymbolNews.ts   Lädt Schlagzeilen einmal je Symbol, für Preview+Full geteilt
   data/watchlist.ts   Beobachtungsliste Aktien & Rohstoff-Futures
   lib/
     time.ts     US-Handelszeiten, Wochentags-Helfer, relative Zeitangaben
-    report.ts    Regelbasierter Kurzbericht-Text
+    report.ts    2-Tage-Filter + regelbasierte Schlagzeilen-Zusammenfassung
 vite.config.ts    Spiegelt api/quotes.js + api/news.js als Dev-Middleware
 ```
