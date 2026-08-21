@@ -11,6 +11,7 @@ import { PriceChart } from './PriceChart'
 import { ChartLegend } from './ChartLegend'
 import { StructureChart } from './StructureChart'
 import { IndicatorPanelCard } from './IndicatorPanelCard'
+import { PriceTargetsCard } from './PriceTargetsCard'
 
 const HORIZON_OPTIONS = [7, 14, 30, 60, 90]
 const WAVE_LABELS = ['0', '1', '2', '3', '4', '5']
@@ -189,6 +190,8 @@ export function SymbolFull({
       )}
 
       {forecast && <IndicatorPanelCard forecast={forecast} />}
+
+      {forecast && <PriceTargetsCard forecast={forecast} unitAbbrev={meta.unitAbbrev} pricePrefix={meta.pricePrefix} />}
 
       {forecast && (
         <Card className="mb-4">

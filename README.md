@@ -32,6 +32,8 @@ neueste Schlagzeile als Vorschau.
   Kategorien (Trend, Oszillatoren, Volatilität, Volumen), jeder einzeln mit Wert,
   Bullisch/Bearisch/Neutral-Einstufung und kurzer Begründung, plus ein Gesamtfazit
   als Durchschnitt aller richtungsgebenden Indikatoren (inkl. RSI-/MACD-Subcharts).
+- **Kursziele (1/3/6/12 Monate)**: Tabelle mit Zielkurs + Unsicherheitszone für jeden
+  der 15 Indikatoren einzeln sowie eine "Gesamt"-Zeile über alle kombiniert.
 - **Zukunftsprojektion**: wählbarer Horizont (7/14/30/60/90 Tage), gestrichelte
   Projektionslinie mit gefülltem Unsicherheitsband direkt im Chart, plus Zielwert ±
   Band als Zahl.
@@ -189,6 +191,37 @@ keine Gewichtung nach historischer Trefferquote und keine Anlageberatung.** Einz
 Indikatoren widersprechen sich in der Praxis häufig; das Gesamtfazit fasst das
 lediglich numerisch zusammen.
 
+### Kursziele für 1/3/6/12 Monate – je Indikator und gesamt (wichtig)
+
+`src/services/priceTargets.ts` (`buildPriceTargets`) übersetzt jede
+Bullisch/Bearisch/Neutral-Einstufung aus dem Indikatoren-Panel in eine
+Kurszielzone (Zielkurs + Unsicherheitsband) für vier feste Horizonte: 1, 3, 6 und
+12 Monate. Angezeigt in der Tabelle **"Kursziele (1/3/6/12 Monate)"**, mit einer
+"Gesamt"-Zeile über alle Indikatoren kombiniert plus einer Zeile je Einzelindikator.
+
+- **Tägliche Drift-Annahme**: eine volle Bullisch- bzw. Bearisch-Einstufung entspricht
+  der Annahme, der Kurs drifte täglich um die Hälfte seiner Tages-Volatilität in diese
+  Richtung; Neutral (und Indikatoren ohne verfügbare Daten, z.B. Volumen-Indikatoren
+  bei Devisen) ergeben Drift 0 – das Kursziel bleibt dort exakt beim aktuellen Kurs.
+- **Fortschreibung**: dieselbe gedämpfte Trendfortschreibung (Holt-Damped-Trend,
+  `src/services/damping.ts`) wie bei der Zukunftsprojektion – die Drift klingt über
+  die Zeit exponentiell ab, statt sich 12 Monate lang unbegrenzt linear
+  fortzusetzen. Dadurch konvergieren die 3-/6-/12-Monats-Zielkurse eines Indikators
+  oft schon nach 1-2 Monaten gegen denselben Wert – das ist beabsichtigt (keine
+  Extrapolationsexplosion), nicht redundant berechnet.
+- **Unsicherheitszone**: wächst weiterhin mit der Wurzel der Zeit, auch wenn der
+  Zielkurs selbst schon konvergiert ist – die Bandbreite der Horizonte 1/3/6/12 Monate
+  unterscheidet sich also klar, auch wenn die Mittelwerte gleich aussehen.
+- **"Gesamt"-Zeile**: verwendet denselben Durchschnitts-Score, der auch im
+  Gesamtfazit der Indikatoren-Karte angezeigt wird – rechnerisch identisch mit dem
+  Mittelwert aller Einzel-Kursziele, weil die gedämpfte Drift linear in ihrer
+  Eingangs-Steigung ist.
+
+Wie überall in dieser App: eine transparente statistische Heuristik auf Basis der
+bereits angezeigten Indikator-Einstufungen – **kein KI-/ML-Modell, keine
+Wahrscheinlichkeitsangabe und keine Anlageberatung.** Bei 15 teils widersprüchlichen
+Indikatoren sind stark abweichende Zielkurse zwischen den Zeilen normal.
+
 ### Wie die Zukunftsprojektion entsteht (statt eines ML-Modells)
 
 Ein Machine-Learning-Modell wie Prophet läuft nur in Python und würde die
@@ -275,6 +308,7 @@ src/
     RsiChart.tsx / MacdChart.tsx  Indikator-Subcharts (Teil des Indikatoren-Panels)
     StructureChart.tsx  Chart mit Fibonacci-Levels + nummerierten Elliott-Wellenpunkten
     IndicatorPanelCard.tsx  Alle 15 Indikatoren gruppiert + Gesamtfazit
+    PriceTargetsCard.tsx  Kursziel-Tabelle je Indikator + gesamt (1/3/6/12 Monate)
     ChartLegend.tsx
     ui.tsx              Wiederverwendbare UI-Bausteine
   services/
@@ -285,13 +319,14 @@ src/
                       Stochastik/CCI/Momentum/Keltner/VWAP/OBV/Volume Profile
                       – reine Arithmetik
     indicatorPanel.ts  Bullisch/Bearisch/Neutral je Indikator + Gesamtfazit
+    priceTargets.ts     Kurszielzonen je Indikator + gesamt für 1/3/6/12 Monate
     damping.ts          Gedämpfte Trendfortschreibung (Holt-Damped-Trend)
     projection.ts        Zukunftsprojektion + Unsicherheitsband
     fibonacci.ts           Fibonacci-Retracement/-Extension-Levels
     elliott.ts               Zigzag-Schwenkpunkte + Elliott-Impuls-Regelcheck
     forecast.ts           Trend-Prognose, Einstiegszone, Stop-Loss, CRV,
-                          bindet indicators/indicatorPanel/damping/projection/
-                          fibonacci/elliott ein
+                          bindet indicators/indicatorPanel/priceTargets/damping/
+                          projection/fibonacci/elliott ein
   hooks/
     useMarketData.ts            Stündliches Auto-Refresh der ganzen Watchlist
     useSymbolTimeframeData.ts    On-Demand-Refetch für den Zeitraum-Umschalter

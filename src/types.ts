@@ -1,6 +1,7 @@
 import type { FibonacciAnalysis } from './services/fibonacci'
 import type { ElliottAnalysis } from './services/elliott'
 import type { IndicatorPanel } from './services/indicatorPanel'
+import type { PriceTargetPanel } from './services/priceTargets'
 
 export interface WatchlistSymbol {
   symbol: string
@@ -38,6 +39,7 @@ export interface Forecast {
   macd: (number | null)[]
   macdSignal: (number | null)[]
   indicatorPanel: IndicatorPanel
+  priceTargets: PriceTargetPanel
   projectionBasis: { currentPrice: number; slopePerHour: number; dailyVolatility: number }
   direction: TradeDirection
   entryLow: number
