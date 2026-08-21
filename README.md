@@ -175,7 +175,10 @@ eine eigene Bullisch/Bearisch/Neutral-Einstufung nach den in der technischen Ana
   (kein reiner Intraday-Session-VWAP, da je nach Zeitraum unterschiedlich lange
   Fenster angezeigt werden); Kurs darüber/darunter = Käufer/Verkäufer dominieren.
 - **On-Balance Volume** – läuft mit +Volumen an Aufwärts- und −Volumen an
-  Abwärtstagen; steigender/fallender Trend bestätigt die Kursbewegung.
+  Abwärtstagen; angezeigt wird die prozentuale Änderung über die letzten 20 Kerzen
+  (nicht der absolute OBV-Stand, der als reine Kennzahl unbegrenzt und je nach
+  Zeitraum stark negativ oder positiv sein kann, ohne dass das allein etwas über die
+  Richtung aussagt – nur seine Veränderung zählt).
 - **Volume Profile (POC)** – verteilt das Volumen auf Preiszonen; Kurs über/unter dem
   Point of Control (der volumenstärksten Zone).
 - Bei Symbolen ohne Handelsvolumen-Daten (z.B. viele Indizes/Devisen) zeigen alle drei
@@ -193,16 +196,29 @@ lediglich numerisch zusammen.
 
 ### Kursziele für 1/3/6/12 Monate – je Indikator und gesamt (wichtig)
 
-`src/services/priceTargets.ts` (`buildPriceTargets`) übersetzt jede
-Bullisch/Bearisch/Neutral-Einstufung aus dem Indikatoren-Panel in eine
-Kurszielzone (Zielkurs + Unsicherheitsband) für vier feste Horizonte: 1, 3, 6 und
-12 Monate. Angezeigt in der Tabelle **"Kursziele (1/3/6/12 Monate)"**, mit einer
-"Gesamt"-Zeile über alle Indikatoren kombiniert plus einer Zeile je Einzelindikator.
+`src/services/priceTargets.ts` (`buildPriceTargets`) übersetzt die **stetige
+Signalstärke** jedes Indikators aus dem Indikatoren-Panel (`strength`, -1..+1 – nicht
+nur die 3-stufige Bullisch/Bearisch/Neutral-Einstufung) in eine Kurszielzone
+(Zielkurs + Unsicherheitsband) für vier feste Horizonte: 1, 3, 6 und 12 Monate.
+Angezeigt in der Tabelle **"Kursziele (1/3/6/12 Monate)"**, mit einer "Gesamt"-Zeile
+über alle Indikatoren kombiniert plus einer Zeile je Einzelindikator.
 
-- **Tägliche Drift-Annahme**: eine volle Bullisch- bzw. Bearisch-Einstufung entspricht
-  der Annahme, der Kurs drifte täglich um die Hälfte seiner Tages-Volatilität in diese
-  Richtung; Neutral (und Indikatoren ohne verfügbare Daten, z.B. Volumen-Indikatoren
-  bei Devisen) ergeben Drift 0 – das Kursziel bleibt dort exakt beim aktuellen Kurs.
+- **Signalstärke statt nur 3 Stufen**: jeder Indikator berechnet zusätzlich zu seinem
+  Rating, *wie weit* er von seiner Schwelle entfernt ist (z.B. wie weit RSI unter 30
+  liegt, wie groß der SMA5/SMA20-Abstand ist) – normiert auf ein Vielfaches der
+  ATR-Quote (ATR/Kurs) des Symbols, nicht auf einen fixen Prozentsatz. Das ist
+  wichtig: bei einem 1-Jahres-Chart sind zweistellige prozentuale Kursabstände normal,
+  bei einem 1-Tages-Chart wären dieselben Prozente extrem. Ohne diese
+  volatilitätsadaptive Normierung liefen bei stark bewegten Symbolen fast alle
+  distanzbasierten Indikatoren gleichzeitig in die Kappung bei ±1 und zeigten
+  identische Kursziele, obwohl ihre zugrunde liegenden Werte unterschiedlich stark
+  ausschlugen.
+- **Tägliche Drift-Annahme**: eine maximale Signalstärke (±1) entspricht der Annahme,
+  der Kurs drifte täglich um die Hälfte seiner Tages-Volatilität in diese Richtung,
+  schwächere Signale entsprechend weniger; Neutral (und Indikatoren ohne verfügbare
+  Daten, z.B. Volumen-Indikatoren bei Devisen) ergeben Drift 0 – das Kursziel bleibt
+  dort exakt beim aktuellen Kurs, deshalb zeigen alle neutral eingestuften Indikatoren
+  denselben (unveränderten) Zielkurs.
 - **Fortschreibung**: dieselbe gedämpfte Trendfortschreibung (Holt-Damped-Trend,
   `src/services/damping.ts`) wie bei der Zukunftsprojektion – die Drift klingt über
   die Zeit exponentiell ab, statt sich 12 Monate lang unbegrenzt linear
@@ -212,8 +228,8 @@ Kurszielzone (Zielkurs + Unsicherheitsband) für vier feste Horizonte: 1, 3, 6 u
 - **Unsicherheitszone**: wächst weiterhin mit der Wurzel der Zeit, auch wenn der
   Zielkurs selbst schon konvergiert ist – die Bandbreite der Horizonte 1/3/6/12 Monate
   unterscheidet sich also klar, auch wenn die Mittelwerte gleich aussehen.
-- **"Gesamt"-Zeile**: verwendet denselben Durchschnitts-Score, der auch im
-  Gesamtfazit der Indikatoren-Karte angezeigt wird – rechnerisch identisch mit dem
+- **"Gesamt"-Zeile**: verwendet den Durchschnitts-`strength`-Wert aller
+  richtungsgebenden Indikatoren (`avgStrength`) – rechnerisch identisch mit dem
   Mittelwert aller Einzel-Kursziele, weil die gedämpfte Drift linear in ihrer
   Eingangs-Steigung ist.
 
