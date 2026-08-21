@@ -2,7 +2,7 @@ import type { Candle } from './marketData'
 import type { Forecast } from '../types'
 import { getHoursUntilMarketClose } from '../lib/time'
 import { bollingerBands, macd as computeMacd, relativeStrengthIndex, simpleMovingAverage } from './indicators'
-import { computeMarketSignal } from './signal'
+import { buildIndicatorPanel } from './indicatorPanel'
 import { dampedDrift } from './damping'
 import { computeFibonacci } from './fibonacci'
 import { analyzeElliott } from './elliott'
@@ -52,10 +52,6 @@ function averageRange(series: Candle[], currentPrice: number): number {
   const ranges = recent.map((c) => c.high - c.low).filter((r) => Number.isFinite(r) && r > 0)
   if (ranges.length === 0) return currentPrice * 0.01
   return ranges.reduce((a, b) => a + b, 0) / ranges.length
-}
-
-function lastValue(values: (number | null)[]): number | null {
-  return values.length > 0 ? values[values.length - 1] : null
 }
 
 /**
@@ -111,14 +107,9 @@ export function computeForecast(symbol: string, series: Candle[], interval: stri
   const rsiFull = relativeStrengthIndex(closes, 14)
   const macdResult = computeMacd(closes, 12, 26, 9)
 
-  const signal = computeMarketSignal({
-    currentPrice,
-    rsi: lastValue(rsiFull),
-    sma5: lastValue(sma5Full),
-    sma20: lastValue(sma20Full),
-    bbHigh: lastValue(bb.high),
-    bbLow: lastValue(bb.low),
-  })
+  // Läuft auf der vollen, ungekürzten Kerzenreihe (nicht nur den fürs Chart sichtbaren
+  // letzten 90 Punkten) – vor allem ADX und ATR profitieren von mehr Historie.
+  const indicatorPanel = buildIndicatorPanel(series)
 
   const clip = <T,>(arr: T[]) => arr.slice(-CHART_POINTS)
 
@@ -144,7 +135,7 @@ export function computeForecast(symbol: string, series: Candle[], interval: stri
     rsi: clip(rsiFull),
     macd: clip(macdResult.macd),
     macdSignal: clip(macdResult.signal),
-    signal,
+    indicatorPanel,
     projectionBasis: { currentPrice, slopePerHour, dailyVolatility },
     direction,
     entryLow,

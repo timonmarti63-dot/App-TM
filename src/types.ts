@@ -1,5 +1,6 @@
 import type { FibonacciAnalysis } from './services/fibonacci'
 import type { ElliottAnalysis } from './services/elliott'
+import type { IndicatorPanel } from './services/indicatorPanel'
 
 export interface WatchlistSymbol {
   symbol: string
@@ -23,14 +24,6 @@ export interface Quote {
 
 export type TradeDirection = 'long' | 'short'
 
-export type MarketRating = 'bullisch' | 'bearisch' | 'neutral'
-
-export interface MarketSignal {
-  rating: MarketRating
-  score: number
-  details: string[]
-}
-
 export interface Forecast {
   symbol: string
   currentPrice: number
@@ -44,7 +37,7 @@ export interface Forecast {
   rsi: (number | null)[]
   macd: (number | null)[]
   macdSignal: (number | null)[]
-  signal: MarketSignal
+  indicatorPanel: IndicatorPanel
   projectionBasis: { currentPrice: number; slopePerHour: number; dailyVolatility: number }
   direction: TradeDirection
   entryLow: number

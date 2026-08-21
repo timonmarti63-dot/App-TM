@@ -5,6 +5,7 @@ export interface Candle {
   close: number
   high: number
   low: number
+  volume: number
 }
 
 export interface QuoteWithSeries {

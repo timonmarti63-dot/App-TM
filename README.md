@@ -28,9 +28,10 @@ neueste Schlagzeile als Vorschau.
 - Chart mit SMA 5/20, Bollinger Bändern, eingezeichneter Einstiegszone, Stop-Loss-
   und Take-Profit-Linien, dazu Setup-Richtung (Long/Short), Chance-Risiko-Verhältnis
   (CRV).
-- **Marktsignal**: Bullisch/Bearisch/Neutral-Einstufung aus einem Punktesystem über
-  RSI(14), SMA5/SMA20-Trendstruktur und Bollinger-Band-Position, mit Begründung je
-  Kennzahl sowie RSI- und MACD(12/26/9)-Subcharts.
+- **Indikatoren & Gesamtfazit**: 15 klassische technische Indikatoren aus vier
+  Kategorien (Trend, Oszillatoren, Volatilität, Volumen), jeder einzeln mit Wert,
+  Bullisch/Bearisch/Neutral-Einstufung und kurzer Begründung, plus ein Gesamtfazit
+  als Durchschnitt aller richtungsgebenden Indikatoren (inkl. RSI-/MACD-Subcharts).
 - **Zukunftsprojektion**: wählbarer Horizont (7/14/30/60/90 Tage), gestrichelte
   Projektionslinie mit gefülltem Unsicherheitsband direkt im Chart, plus Zielwert ±
   Band als Zahl.
@@ -130,26 +131,63 @@ Reale Kurse hängen von Nachrichten, Marktstimmung u.v.m. ab, die dieses Modell 
 kennt – die Zahlen sind eine nachvollziehbare Illustration von Trend und Volatilität,
 keine verlässliche Vorhersage und keine Handelsempfehlung.
 
-### Technische Indikatoren & Marktsignal
+### 15 technische Indikatoren & Gesamtfazit (wichtig)
 
 `src/services/indicators.ts` berechnet klassische, weit verbreitete Kennzahlen (reine
-Arithmetik über die Kursreihe des gewählten Zeitraums, kein externer Dienst):
+Arithmetik über die Kerzenreihe des gewählten Zeitraums – Schlusskurse bzw.
+High/Low/Close/Volumen je nach Indikator, kein externer Dienst). Für jeden Indikator
+läuft dieselbe Berechnung auf der vollen geladenen Historie (nicht nur den im Chart
+sichtbaren letzten ~90 Punkten), damit z.B. ADX genug Kerzen zum Einschwingen hat.
+`src/services/indicatorPanel.ts` (`buildIndicatorPanel`) leitet aus jedem Indikator
+eine eigene Bullisch/Bearisch/Neutral-Einstufung nach den in der technischen Analyse
+üblichen Standardregeln ab:
 
-- **RSI(14)** – Wilder-Glättung von Kursgewinnen/-verlusten, 0-100.
-- **MACD(12/26/9)** – Differenz aus EMA12 und EMA26, plus EMA9 der Differenz als
-  Signallinie.
-- **Bollinger Bänder(20, 2σ)** – SMA20 ± 2 Populations-Standardabweichungen.
+**Trend**
+- **SMA 5/20** – Kreuzung der beiden gleitenden Durchschnitte (Golden-/Death-Cross).
+- **EMA 20** – Kurs oberhalb/unterhalb des exponentiellen gleitenden Durchschnitts.
+- **MACD(12/26/9)** – MACD-Linie (EMA12−EMA26) über/unter ihrer EMA9-Signallinie.
+- **Parabolic SAR** – iterative Trendfolge-Punkte; Kurs über/unter dem SAR-Punkt.
+- **ADX(14)** – Trendstärke (ADX) plus Richtung (+DI/−DI); unter 20 gilt der Trend als
+  zu schwach für eine Richtungsaussage.
 
-`src/services/signal.ts` (`computeMarketSignal`) wertet daraus ein
-Bullisch/Bearisch/Neutral-Signal mit Punktesystem aus: RSI < 30 bzw. > 70 (±1), Kurs
-über/unter SMA5 bei gleichzeitigem SMA5/SMA20-Crossover (±2), Kurs am unteren/oberen
-Bollinger-Band (±1) – ab Score ±2 gilt Bullisch/Bearisch, sonst Neutral. Das ist an
-ein klassisches, öffentlich bekanntes Trader-Schema angelehnt (Golden-Cross-Logik,
-RSI-Überkauft/-Überverkauft, Band-Extreme), verwendet aber SMA5/SMA20 statt SMA50/200
-– bei den hier geladenen Zeitreihen (bis zu ~90-260 Kerzen, je nach Zeitraum) wäre ein
-200er-Fenster oft noch gar nicht berechenbar. Wie bei allen anderen Werten hier gilt:
-eine regelbasierte Kennzahlen-Auswertung, keine Analyse durch Menschen und keine
-Anlageberatung.
+**Oszillatoren**
+- **RSI(14)** – Wilder-Glättung von Kursgewinnen/-verlusten; unter 30 überverkauft,
+  über 70 überkauft.
+- **Stochastik(14,3)** – Position des Kurses in der Hoch-Tief-Spanne; unter 20/über 80
+  = überverkauft/überkauft.
+- **CCI(20)** – Abweichung des typischen Kurses von seinem SMA; über +100/unter −100 =
+  starker Trend.
+- **Momentum(10)** – Kursdifferenz zu vor 10 Kerzen.
+
+**Volatilität**
+- **Bollinger-Bänder(20, 2σ)** – Kurs am unteren/oberen Band = statistisch überdehnt
+  (Gegenbewegungs-Lesart).
+- **ATR(14)** – Wilder-geglättete durchschnittliche Handelsspanne. Reines
+  Volatilitätsmaß ohne Richtung – fließt bewusst **nicht** ins Gesamtfazit ein, die
+  Notiz beschreibt stattdessen, ob die Volatilität gerade steigt oder fällt.
+- **Keltner-Kanäle(20, 2×ATR10)** – Kurs über/unter dem Kanal = Ausbruchssignal
+  (Breakout-Lesart, bewusst anders interpretiert als die Bollinger-Bänder).
+
+**Volumen**
+- **VWAP** – kumulierter volumengewichteter Durchschnittspreis über das Chart-Fenster
+  (kein reiner Intraday-Session-VWAP, da je nach Zeitraum unterschiedlich lange
+  Fenster angezeigt werden); Kurs darüber/darunter = Käufer/Verkäufer dominieren.
+- **On-Balance Volume** – läuft mit +Volumen an Aufwärts- und −Volumen an
+  Abwärtstagen; steigender/fallender Trend bestätigt die Kursbewegung.
+- **Volume Profile (POC)** – verteilt das Volumen auf Preiszonen; Kurs über/unter dem
+  Point of Control (der volumenstärksten Zone).
+- Bei Symbolen ohne Handelsvolumen-Daten (z.B. viele Indizes/Devisen) zeigen alle drei
+  Volumen-Indikatoren transparent "keine Daten verfügbar" statt eine Richtung zu
+  erfinden.
+
+**Gesamtfazit**: der einfache Durchschnitt über alle Indikatoren, die tatsächlich eine
+Richtung liefern (+1 je Bullisch, −1 je Bearisch, 0 je Neutral) – ATR und Indikatoren
+ohne verfügbare Daten zählen nicht mit. Score über +0,15 gilt als Bullisch, unter
+−0,15 als Bearisch, dazwischen Neutral. Das ist eine transparente
+Mehrheits-/Durchschnittsauswertung regelbasierter Kennzahlen – **kein KI-/ML-Modell,
+keine Gewichtung nach historischer Trefferquote und keine Anlageberatung.** Einzelne
+Indikatoren widersprechen sich in der Praxis häufig; das Gesamtfazit fasst das
+lediglich numerisch zusammen.
 
 ### Wie die Zukunftsprojektion entsteht (statt eines ML-Modells)
 
@@ -219,7 +257,8 @@ Bündelung der Titel, keine inhaltliche Einordnung.
 
 ```
 api/
-  quotes.js        Serverlose Function – Kurse/Historie/Kennzahlen, ohne API-Key
+  quotes.js        Serverlose Function – Kurse/Historie (inkl. Volumen)/Kennzahlen,
+                   ohne API-Key
   news.js           Serverlose Function – Schlagzeilen, ohne API-Key
   search.js         Serverlose Function – Symbolsuche, ohne API-Key
   _lib/yahoo.js     Fetch- & Parse-Logik für alle drei Yahoo-Finance-Endpunkte
@@ -227,27 +266,31 @@ src/
   components/market/
     SymbolTable.tsx    Kategorie-/Watchlist-Tabelle (Level 1)
     SymbolPreview.tsx   Kurzansicht: Chart + Prognose + 1 Schlagzeile (Level 2)
-    SymbolFull.tsx      Vollansicht: Zeitraum, SL/TP-Chart, Marktsignal,
-                        Projektion, Kennzahlen, Schlagzeilen (Level 3)
+    SymbolFull.tsx      Vollansicht: Zeitraum, SL/TP-Chart, Indikatoren-Panel,
+                        Projektion, Fibonacci/Elliott, Kennzahlen, Schlagzeilen
+                        (Level 3)
     SymbolSearch.tsx    Freitextsuche mit Live-Vorschlägen
     PriceChart.tsx      Chart-Basis (Kurs, SMA 5/20, Bollinger, optional
                         Entry/SL/TP, optional Projektion+Band)
-    RsiChart.tsx / MacdChart.tsx  Indikator-Subcharts (nur Vollansicht)
+    RsiChart.tsx / MacdChart.tsx  Indikator-Subcharts (Teil des Indikatoren-Panels)
     StructureChart.tsx  Chart mit Fibonacci-Levels + nummerierten Elliott-Wellenpunkten
+    IndicatorPanelCard.tsx  Alle 15 Indikatoren gruppiert + Gesamtfazit
     ChartLegend.tsx
     ui.tsx              Wiederverwendbare UI-Bausteine
   services/
     marketData.ts   Client für /api/quotes, Zeitraum-Definitionen
     newsData.ts      Client für /api/news
     searchData.ts    Client für /api/search
-    indicators.ts     SMA/EMA/RSI/MACD/Bollinger – reine Arithmetik
-    signal.ts          Bullisch/Bearisch/Neutral-Punktesystem
+    indicators.ts     SMA/EMA/RSI/MACD/Bollinger/ATR/ADX/Parabolic SAR/
+                      Stochastik/CCI/Momentum/Keltner/VWAP/OBV/Volume Profile
+                      – reine Arithmetik
+    indicatorPanel.ts  Bullisch/Bearisch/Neutral je Indikator + Gesamtfazit
     damping.ts          Gedämpfte Trendfortschreibung (Holt-Damped-Trend)
     projection.ts        Zukunftsprojektion + Unsicherheitsband
     fibonacci.ts           Fibonacci-Retracement/-Extension-Levels
     elliott.ts               Zigzag-Schwenkpunkte + Elliott-Impuls-Regelcheck
     forecast.ts           Trend-Prognose, Einstiegszone, Stop-Loss, CRV,
-                          bindet indicators/signal/damping/projection/
+                          bindet indicators/indicatorPanel/damping/projection/
                           fibonacci/elliott ein
   hooks/
     useMarketData.ts            Stündliches Auto-Refresh der ganzen Watchlist

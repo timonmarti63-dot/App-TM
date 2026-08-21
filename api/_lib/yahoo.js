@@ -30,6 +30,7 @@ async function fetchSymbol(symbol, { interval = '1h', range = '5d' } = {}) {
   const closesRaw = quote.close ?? []
   const highsRaw = quote.high ?? []
   const lowsRaw = quote.low ?? []
+  const volumesRaw = quote.volume ?? []
 
   // Bei nicht-intraday Intervallen (z.B. 1d/1wk) liefert Yahoo kein meta.previousClose –
   // dann die vorletzte Kerze des Zeitraums selbst als Vergleichswert nehmen (ergibt die
@@ -50,6 +51,7 @@ async function fetchSymbol(symbol, { interval = '1h', range = '5d' } = {}) {
       close: closesRaw[i],
       high: highsRaw[i],
       low: lowsRaw[i],
+      volume: typeof volumesRaw[i] === 'number' ? volumesRaw[i] : 0,
     }))
     .filter((c) => typeof c.close === 'number' && typeof c.high === 'number' && typeof c.low === 'number')
 
