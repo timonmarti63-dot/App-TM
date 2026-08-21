@@ -1,6 +1,12 @@
 import { fetchQuotes } from './_lib/yahoo.js'
+import { isAuthenticated } from './_lib/auth.js'
 
 export default async function handler(req, res) {
+  if (!isAuthenticated(req)) {
+    res.status(401).json({ error: 'Nicht angemeldet.' })
+    return
+  }
+
   const url = new URL(req.url, 'http://localhost')
   const symbolsParam = req.query?.symbols ?? url.searchParams.get('symbols')
   const interval = req.query?.interval ?? url.searchParams.get('interval') ?? undefined

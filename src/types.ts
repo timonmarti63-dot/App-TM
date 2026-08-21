@@ -48,6 +48,7 @@ export interface Forecast {
   macd: (number | null)[]
   macdSignal: (number | null)[]
   signal: MarketSignal
+  projectionBasis: { currentPrice: number; slopePerHour: number; dailyVolatility: number }
   direction: TradeDirection
   entryLow: number
   entryHigh: number

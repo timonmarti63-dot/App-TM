@@ -3,6 +3,7 @@ import type { Forecast } from '../types'
 import { getUsMarketClock } from '../lib/time'
 import { bollingerBands, macd as computeMacd, relativeStrengthIndex, simpleMovingAverage } from './indicators'
 import { computeMarketSignal } from './signal'
+import { dampedDrift } from './damping'
 
 const CHART_POINTS = 90
 const TRADING_HOURS_PER_DAY = 6.5
@@ -78,10 +79,13 @@ export function computeForecast(symbol: string, series: Candle[], interval: stri
 
   const { hoursUntilClose } = getUsMarketClock()
   const dailySlope = slopePerHour * TRADING_HOURS_PER_DAY
-  const endOfDayEstimate = currentPrice + slopePerHour * hoursUntilClose
-  const sevenDayEstimate = currentPrice + dailySlope * 7
+  const endOfDayEstimate = currentPrice + dampedDrift(dailySlope, hoursUntilClose / TRADING_HOURS_PER_DAY)
+  const sevenDayEstimate = currentPrice + dampedDrift(dailySlope, 7)
 
   const avgRange = averageRange(series, currentPrice)
+  // Random-Walk-Näherung: Volatilität über N Kerzen/Tag skaliert mit sqrt(N).
+  const candlesPerDay = TRADING_HOURS_PER_DAY / candleHours(interval)
+  const dailyVolatility = avgRange * Math.sqrt(candlesPerDay)
   const direction = slopePerCandle >= 0 ? 'long' : 'short'
 
   let entryLow: number
@@ -132,6 +136,7 @@ export function computeForecast(symbol: string, series: Candle[], interval: stri
     macd: clip(macdResult.macd),
     macdSignal: clip(macdResult.signal),
     signal,
+    projectionBasis: { currentPrice, slopePerHour, dailyVolatility },
     direction,
     entryLow,
     entryHigh,

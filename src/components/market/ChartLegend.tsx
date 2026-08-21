@@ -1,4 +1,4 @@
-export function ChartLegend({ variant = 'full' }: { variant?: 'simple' | 'full' }) {
+export function ChartLegend({ variant = 'full', showProjection = false }: { variant?: 'simple' | 'full'; showProjection?: boolean }) {
   const items: { label: string; swatch: string }[] = [
     { label: 'Kurs', swatch: 'bg-[var(--accent)]' },
     { label: 'SMA 5', swatch: 'bg-[var(--sma5)]' },
@@ -11,6 +11,7 @@ export function ChartLegend({ variant = 'full' }: { variant?: 'simple' | 'full' 
           { label: 'Take-Profit', swatch: 'bg-[var(--good)]' },
         ]
       : []),
+    ...(showProjection ? [{ label: 'Projektion + Unsicherheitsband', swatch: 'bg-[var(--projection)]' }] : []),
   ]
   return (
     <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-[var(--text-muted)]">

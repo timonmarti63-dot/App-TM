@@ -4,6 +4,7 @@ import { formatCurrency, formatPercent, formatRiskReward, formatVolume } from '.
 import { buildHeadlineSummary, filterRecentNews } from '../../lib/report'
 import { formatRelativeTime } from '../../lib/time'
 import { TIMEFRAMES, DEFAULT_TIMEFRAME } from '../../services/marketData'
+import { buildProjection } from '../../services/projection'
 import { useSymbolTimeframeData } from '../../hooks/useSymbolTimeframeData'
 import { Badge, Button, Card, SectionHeading } from '../ui'
 import { PriceChart } from './PriceChart'
@@ -13,6 +14,7 @@ import { MacdChart } from './MacdChart'
 
 const RATING_LABEL: Record<string, string> = { bullisch: '▲ Bullisch', bearisch: '▼ Bearisch', neutral: '● Neutral' }
 const RATING_TONE: Record<string, 'good' | 'critical' | 'neutral'> = { bullisch: 'good', bearisch: 'critical', neutral: 'neutral' }
+const HORIZON_OPTIONS = [7, 14, 30, 60, 90]
 
 function TradeRow({ label, value, tone }: { label: string; value: string; tone?: 'good' | 'critical' }) {
   const color = tone === 'good' ? 'text-[var(--good-text)]' : tone === 'critical' ? 'text-[var(--critical)]' : 'text-[var(--text-primary)]'
@@ -44,8 +46,12 @@ export function SymbolFull({
   onBack: () => void
 }) {
   const [timeframe, setTimeframe] = useState(DEFAULT_TIMEFRAME)
+  const [horizon, setHorizon] = useState(30)
   const { quote, forecast, loading, error } = useSymbolTimeframeData(symbol, timeframe)
   const { news: recentNews, isFallback } = filterRecentNews(news ?? [])
+
+  const projection = forecast ? buildProjection(forecast.projectionBasis, horizon) : undefined
+  const projectionTarget = projection ? projection[projection.length - 1] : null
 
   return (
     <div>
@@ -90,10 +96,27 @@ export function SymbolFull({
             </div>
           </div>
 
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="text-xs text-[var(--text-muted)]">Projektionshorizont</span>
+            <div className="flex gap-1 rounded-lg bg-[var(--surface-2)] p-1">
+              {HORIZON_OPTIONS.map((days) => (
+                <button
+                  key={days}
+                  onClick={() => setHorizon(days)}
+                  className={`cursor-pointer rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                    days === horizon ? 'bg-[var(--projection)] text-white' : 'text-[var(--text-secondary)] hover:bg-[var(--surface-1)]'
+                  }`}
+                >
+                  {days}T
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className={`mt-4 flex flex-col gap-4 lg:flex-row lg:items-stretch ${loading ? 'opacity-50' : ''}`}>
             <div className="lg:w-3/5">
-              <PriceChart forecast={forecast} unitAbbrev={meta.unitAbbrev} pricePrefix={meta.pricePrefix} variant="full" />
-              <ChartLegend variant="full" />
+              <PriceChart forecast={forecast} unitAbbrev={meta.unitAbbrev} pricePrefix={meta.pricePrefix} variant="full" projection={projection} />
+              <ChartLegend variant="full" showProjection />
             </div>
             <div className="flex-1 rounded-lg bg-[var(--surface-2)] px-3 py-1">
               <div className="flex items-center justify-between py-1.5">
@@ -141,12 +164,27 @@ export function SymbolFull({
               <div className="text-[11px] text-[var(--text-muted)]">Zeitraum</div>
               <div className="font-mono text-xs text-[var(--text-primary)]">{timeframe.label}</div>
             </div>
+            {projectionTarget && (
+              <div className="rounded-lg bg-[var(--surface-2)] p-2 text-center sm:col-span-4">
+                <div className="text-[11px] text-[var(--text-muted)]">Projektion in {horizon} Tagen (± Unsicherheitsband)</div>
+                <div className="font-mono text-sm font-semibold text-[var(--projection)]">
+                  {formatCurrency(projectionTarget.price, meta.unitAbbrev, meta.pricePrefix)}
+                  <span className="ml-1 text-xs font-normal text-[var(--text-muted)]">
+                    ({formatCurrency(projectionTarget.lower, undefined, meta.pricePrefix)} – {formatCurrency(projectionTarget.upper, undefined, meta.pricePrefix)})
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
           <p className="mt-3 text-xs text-[var(--text-muted)]">
             Einstiegszone, Stop-Loss und Chance-Risiko-Verhältnis (CRV) sind statistische Schätzungen aus Kurstrend
             und Schwankungsbreite im gewählten Zeitraum – keine Anlageberatung und keine Garantie für den
-            tatsächlichen Kursverlauf. SMA 5/20 sind gleitende Durchschnitte über die letzten 5 bzw. 20 Kerzen.
+            tatsächlichen Kursverlauf. SMA 5/20 sind gleitende Durchschnitte über die letzten 5 bzw. 20 Kerzen. Die
+            Projektion ist eine gedämpfte Fortschreibung des Trends (die Steigung klingt über die Zeit ab, statt
+            unbegrenzt linear weiterzulaufen) mit einem Unsicherheitsband, das mit der Wurzel der Zeit wächst
+            (Random-Walk-Näherung) – <strong>kein KI-/ML-Modell</strong> und keine kalibrierte Wahrscheinlichkeit,
+            sondern eine transparente statistische Heuristik.
           </p>
         </Card>
       )}

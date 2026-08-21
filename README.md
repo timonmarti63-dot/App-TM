@@ -2,10 +2,15 @@
 
 Live-Marktübersicht für Aktien, Rohstoffe, Kryptowährungen, Indizes und Devisen –
 mit Charts, technischen Indikatoren, automatisch berechneten Trade-Setups
-(Einstiegszone/Stop-Loss/Take-Profit) und aktuellen Schlagzeilen. Keine Anmeldung,
-kein API-Key, kein eigener Server zum Betreiben.
+(Einstiegszone/Stop-Loss/Take-Profit), einer Zukunftsprojektion mit
+Unsicherheitsband und aktuellen Schlagzeilen. Passwortgeschützt, kein API-Key
+nötig, kein eigener Server zum Betreiben.
 
 ## Features
+
+**0. Login** – die App ist über ein Passwort geschützt (serverseitige, signierte
+Session-Cookie – siehe unten). Ohne gültige Session liefern auch die `/api/…`-Routen
+selbst nur 401, nicht nur die Oberfläche.
 
 **1. Marktübersicht** – Startseite mit:
 - Freitextsuche nach einem beliebigen Symbol weltweit (Aktien, ETFs, Krypto, Indizes,
@@ -30,6 +35,9 @@ neueste Schlagzeile als Vorschau.
 - **Marktsignal**: Bullisch/Bearisch/Neutral-Einstufung aus einem Punktesystem über
   RSI(14), SMA5/SMA20-Trendstruktur und Bollinger-Band-Position, mit Begründung je
   Kennzahl sowie RSI- und MACD(12/26/9)-Subcharts.
+- **Zukunftsprojektion**: wählbarer Horizont (7/14/30/60/90 Tage), gestrichelte
+  Projektionslinie mit gefülltem Unsicherheitsband direkt im Chart, plus Zielwert ±
+  Band als Zahl.
 - Kennzahlen-Panel: Tagesspanne, 52-Wochen-Spanne, Handelsvolumen.
 - Alle Schlagzeilen der letzten 48 Stunden mit Original-Link, plus eine automatisch
   aus den Schlagzeilen-Titeln zusammengestellte deutsche Kurzfassung.
@@ -44,8 +52,21 @@ npm install
 npm run dev
 ```
 
-App läuft dann unter `http://localhost:5173` – alles funktioniert direkt, ohne Account
-oder Key irgendwo anzulegen.
+App läuft dann unter `http://localhost:5173`. Ohne `APP_PASSWORD` in einer
+`.env.local`-Datei zeigt der Dev-Server beim Start ein Test-Passwort in der
+Konsole an ("lokales_testpasswort") – zur Bequemlichkeit nur im lokalen
+`npm run dev`, niemals in Produktion.
+
+Für ein echtes Passwort lokal: eine Datei `.env.local` im Projektwurzelverzeichnis
+anlegen mit
+
+```
+APP_PASSWORD=dein-eigenes-passwort
+```
+
+Für ein Deployment (z.B. Vercel): die Umgebungsvariable `APP_PASSWORD` in den
+Projekteinstellungen setzen. **Ist sie dort nicht gesetzt, bleibt die App komplett
+gesperrt** ("fail closed") – kein unbeabsichtigt offenes Deployment.
 
 Build für Deployment:
 
@@ -142,6 +163,38 @@ RSI-Überkauft/-Überverkauft, Band-Extreme), verwendet aber SMA5/SMA20 statt SM
 eine regelbasierte Kennzahlen-Auswertung, keine Analyse durch Menschen und keine
 Anlageberatung.
 
+### Wie der Passwortschutz funktioniert
+
+Kein Datenbank-Login nötig: `api/_lib/auth.js` signiert bei erfolgreichem Login ein
+Token `Ablaufzeit.HMAC-Signatur` mit `APP_PASSWORD` selbst als Schlüssel und setzt es
+als httpOnly-Cookie (24h gültig). Jede der drei Daten-Routen (`quotes`, `news`,
+`search`) prüft dieses Cookie serverseitig, bevor sie irgendetwas ausliefert – die
+API ist also genauso geschützt wie die Oberfläche, nicht nur client-seitig
+versteckt. `api/auth.js` bietet GET (Session prüfen), POST (einloggen) und DELETE
+(abmelden). `vite.config.ts` spiegelt dieselbe Logik für `npm run dev`.
+
+### Wie die Zukunftsprojektion entsteht (statt eines ML-Modells)
+
+Ein Machine-Learning-Modell wie Prophet läuft nur in Python und würde die
+Zero-Setup-Architektur dieser App aufgeben. Stattdessen nutzt
+`src/services/projection.ts` eine transparente statistische Heuristik:
+
+- **Mittelwert-Linie**: dieselbe Regressions-Steigung wie bei den Kurszielen, aber
+  **gedämpft** (`src/services/damping.ts`, Holt-Damped-Trend-Prinzip) – die Steigung
+  klingt mit der Zeit exponentiell ab, statt sich unbegrenzt linear
+  fortzuschreiben. Ohne diese Dämpfung würde eine kurze, verrauschte Steigung aus
+  z.B. 5 Tagen Historie bei einem 90-Tage-Horizont zu unplausibel großen Ausschlägen
+  führen (in einem Test: +32% in 30 Tagen für einen als "bearisch" markierten
+  Titel) – mit Dämpfung konvergiert die Projektion stattdessen gegen einen
+  begrenzten Wert.
+- **Unsicherheitsband**: wächst mit der Wurzel der Zeit (`Volatilität × √Tage`) –
+  eine Random-Walk-Näherung dafür, dass sich zufällige Kursschwankungen über die
+  Zeit aufsummieren.
+
+Explizit **kein KI-/ML-Modell**, keine Bayes'sche Trend-/Saisonalitätszerlegung wie
+Prophet, keine kalibrierte Wahrscheinlichkeit – eine nachvollziehbare Illustration,
+keine Vorhersage.
+
 ### Schlagzeilen & Zusammenfassung
 
 Die Kurzansicht zeigt bereits die neueste Schlagzeile als Teaser; die Vollansicht
@@ -157,34 +210,44 @@ Bündelung der Titel, keine inhaltliche Einordnung.
 
 ```
 api/
-  quotes.js        Serverlose Function – Kurse/Historie/Kennzahlen, ohne API-Key
-  news.js           Serverlose Function – Schlagzeilen, ohne API-Key
-  search.js         Serverlose Function – Symbolsuche, ohne API-Key
-  _lib/yahoo.js     Fetch- & Parse-Logik für alle drei Yahoo-Finance-Endpunkte
+  auth.js           Serverlose Function – Login/Logout/Session-Check
+  quotes.js          Serverlose Function – Kurse/Historie/Kennzahlen
+  news.js             Serverlose Function – Schlagzeilen
+  search.js           Serverlose Function – Symbolsuche
+  _lib/
+    yahoo.js           Fetch- & Parse-Logik für alle Yahoo-Finance-Endpunkte
+    auth.js             Session-Token signieren/prüfen (HMAC, kein DB nötig)
 src/
-  components/market/
-    SymbolTable.tsx    Kategorie-/Watchlist-Tabelle (Level 1)
-    SymbolPreview.tsx   Kurzansicht: Chart + Prognose + 1 Schlagzeile (Level 2)
-    SymbolFull.tsx      Vollansicht: Zeitraum, SL/TP-Chart, Kennzahlen,
-                        Schlagzeilen + Zusammenfassung (Level 3)
-    SymbolSearch.tsx    Freitextsuche mit Live-Vorschlägen
-    PriceChart.tsx      Chart-Basis (Kurs, SMA 5/20, Bollinger, optional Entry/SL/TP)
-    RsiChart.tsx / MacdChart.tsx  Indikator-Subcharts (nur Vollansicht)
-    ChartLegend.tsx
-    ui.tsx              Wiederverwendbare UI-Bausteine
+  components/
+    Login.tsx           Passwort-Maske
+    market/
+      SymbolTable.tsx    Kategorie-/Watchlist-Tabelle (Level 1)
+      SymbolPreview.tsx   Kurzansicht: Chart + Prognose + 1 Schlagzeile (Level 2)
+      SymbolFull.tsx      Vollansicht: Zeitraum, SL/TP-Chart, Marktsignal,
+                          Projektion, Kennzahlen, Schlagzeilen (Level 3)
+      SymbolSearch.tsx    Freitextsuche mit Live-Vorschlägen
+      PriceChart.tsx      Chart-Basis (Kurs, SMA 5/20, Bollinger, optional
+                          Entry/SL/TP, optional Projektion+Band)
+      RsiChart.tsx / MacdChart.tsx  Indikator-Subcharts (nur Vollansicht)
+      ChartLegend.tsx
+    ui.tsx                Wiederverwendbare UI-Bausteine
   services/
-    marketData.ts   Client für /api/quotes, Zeitraum-Definitionen
-    newsData.ts      Client für /api/news
-    searchData.ts    Client für /api/search
-    indicators.ts     SMA/EMA/RSI/MACD/Bollinger – reine Arithmetik
-    signal.ts          Bullisch/Bearisch/Neutral-Punktesystem
-    forecast.ts         Trend-Prognose, Einstiegszone, Stop-Loss, CRV, bindet
-                        indicators.ts + signal.ts ein
+    authData.ts     Client für /api/auth
+    marketData.ts    Client für /api/quotes, Zeitraum-Definitionen
+    newsData.ts       Client für /api/news
+    searchData.ts     Client für /api/search
+    indicators.ts      SMA/EMA/RSI/MACD/Bollinger – reine Arithmetik
+    signal.ts           Bullisch/Bearisch/Neutral-Punktesystem
+    damping.ts           Gedämpfte Trendfortschreibung (Holt-Damped-Trend)
+    projection.ts         Zukunftsprojektion + Unsicherheitsband
+    forecast.ts            Trend-Prognose, Einstiegszone, Stop-Loss, CRV,
+                           bindet indicators/signal/damping/projection ein
   hooks/
-    useMarketData.ts         Stündliches Auto-Refresh der ganzen Watchlist
-    useSymbolTimeframeData.ts On-Demand-Refetch für den Zeitraum-Umschalter
-    useSymbolNews.ts          Lädt Schlagzeilen einmal je Symbol
-    useFavorites.ts            Persönliche Watchlist (localStorage)
+    useAuth.ts                 Login-Status, login()/logout()
+    useMarketData.ts            Stündliches Auto-Refresh der ganzen Watchlist
+    useSymbolTimeframeData.ts    On-Demand-Refetch für den Zeitraum-Umschalter
+    useSymbolNews.ts              Lädt Schlagzeilen einmal je Symbol
+    useFavorites.ts                Persönliche Watchlist (localStorage)
     useLocalStorage.ts
   data/watchlist.ts   Beobachtungslisten je Kategorie + Einheiten-Metadaten
   lib/
@@ -192,5 +255,5 @@ src/
     report.ts     2-Tage-Filter + regelbasierte Schlagzeilen-Zusammenfassung
     symbolMeta.ts  Leitet Anzeige-Metadaten aus Suchtreffern ab
     format.ts      Preis-/Prozent-/Volumen-Formatierung
-vite.config.ts    Spiegelt api/quotes.js, api/news.js, api/search.js als Dev-Middleware
+vite.config.ts    Spiegelt alle api/*.js-Routen als Dev-Middleware, inkl. Auth
 ```
