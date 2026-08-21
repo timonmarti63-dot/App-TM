@@ -1,5 +1,6 @@
 import type { Forecast } from '../../types'
 import type { PriceTargetPoint } from '../../services/priceTargets'
+import type { IndicatorHorizon } from '../../services/indicatorPanel'
 import { formatCurrency } from '../../lib/format'
 import { Badge, Card } from '../ui'
 
@@ -19,68 +20,82 @@ function TargetCell({ point, unitAbbrev, pricePrefix }: { point: PriceTargetPoin
 }
 
 /**
- * Tabelle mit Kurszielzone (Zielkurs + Unsicherheitsband) für 1/3/6/12 Monate: eine
- * "Gesamt"-Zeile (alle Indikatoren kombiniert, aus demselben Durchschnitts-Score wie
- * das Gesamtfazit oben) und je eine Zeile pro Indikator aus indicatorPanel.ts. Siehe
- * priceTargets.ts für die genaue Berechnung.
+ * Tabelle mit Kurszielzone (Zielkurs + Unsicherheitsband) für 1/3/6/12 Monate –
+ * getrennt nach kurzfristigen (Trading-) und langfristigen (Investment-)Indikatoren
+ * (siehe IndicatorHorizon in indicatorPanel.ts), jeweils mit eigener "Gesamt"-Zeile.
+ * Siehe priceTargets.ts für die genaue Berechnung.
  */
 export function PriceTargetsCard({ forecast, unitAbbrev, pricePrefix }: { forecast: Forecast; unitAbbrev: string; pricePrefix: string }) {
-  const { perIndicator, overall } = forecast.priceTargets
-  const consensusRating = forecast.indicatorPanel.consensus.rating
+  const { perIndicator, overallShort, overallLong } = forecast.priceTargets
+  const { consensusShort, consensusLong } = forecast.indicatorPanel
+
+  const groups: { horizon: IndicatorHorizon; title: string; gesamtLabel: string; overall: PriceTargetPoint[]; rating: string }[] = [
+    { horizon: 'kurzfristig', title: 'Kurzfristig (Trading)', gesamtLabel: 'Gesamt (kurzfristig)', overall: overallShort, rating: consensusShort.rating },
+    { horizon: 'langfristig', title: 'Langfristig (Investment)', gesamtLabel: 'Gesamt (langfristig)', overall: overallLong, rating: consensusLong.rating },
+  ]
 
   return (
     <Card className="mb-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-medium text-[var(--text-muted)]">Kursziele (1/3/6/12 Monate)</h3>
-        <Badge tone={RATING_TONE[consensusRating]}>{RATING_LABEL[consensusRating]}</Badge>
-      </div>
+      <h3 className="text-sm font-medium text-[var(--text-muted)]">Kursziele (1/3/6/12 Monate)</h3>
 
-      <div className="mt-3 overflow-x-auto">
-        <table className="w-full min-w-[560px] border-collapse text-sm">
-          <thead>
-            <tr className="border-b border-[var(--border)] text-left text-[11px] text-[var(--text-muted)]">
-              <th className="py-1.5 pr-2 font-medium">Indikator</th>
-              {overall.map((p) => (
-                <th key={p.horizonDays} className="px-2 py-1.5 text-right font-medium">
-                  {p.horizonLabel}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            <tr className="border-b border-[var(--border)] bg-[var(--surface-2)]">
-              <td className="py-2 pr-2 font-medium text-[var(--text-primary)]">Gesamt (alle Indikatoren)</td>
-              {overall.map((p) => (
-                <TargetCell key={p.horizonDays} point={p} unitAbbrev={unitAbbrev} pricePrefix={pricePrefix} />
-              ))}
-            </tr>
-            {perIndicator.map((ind) => (
-              <tr key={ind.key} className="border-b border-[var(--border)] last:border-none">
-                <td className="py-2 pr-2 align-top text-[var(--text-secondary)]">
-                  <div>{ind.label}</div>
-                  <div className="mt-0.5">
-                    <Badge tone={RATING_TONE[ind.rating]}>{RATING_LABEL[ind.rating]}</Badge>
-                  </div>
-                </td>
-                {ind.points.map((p) => (
-                  <TargetCell key={p.horizonDays} point={p} unitAbbrev={unitAbbrev} pricePrefix={pricePrefix} />
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {groups.map((group) => {
+        const rows = perIndicator.filter((ind) => ind.horizon === group.horizon)
+        return (
+          <div key={group.horizon} className="mt-4">
+            <div className="flex items-center justify-between gap-2">
+              <h4 className="text-sm font-semibold text-[var(--text-primary)]">{group.title}</h4>
+              <Badge tone={RATING_TONE[group.rating]}>{RATING_LABEL[group.rating]}</Badge>
+            </div>
 
-      <p className="mt-3 text-xs text-[var(--text-muted)]">
+            <div className="mt-2 overflow-x-auto">
+              <table className="w-full min-w-[560px] border-collapse text-sm">
+                <thead>
+                  <tr className="border-b border-[var(--border)] text-left text-[11px] text-[var(--text-muted)]">
+                    <th className="py-1.5 pr-2 font-medium">Indikator</th>
+                    {group.overall.map((p) => (
+                      <th key={p.horizonDays} className="px-2 py-1.5 text-right font-medium">
+                        {p.horizonLabel}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="border-b border-[var(--border)] bg-[var(--surface-2)]">
+                    <td className="py-2 pr-2 font-medium text-[var(--text-primary)]">{group.gesamtLabel}</td>
+                    {group.overall.map((p) => (
+                      <TargetCell key={p.horizonDays} point={p} unitAbbrev={unitAbbrev} pricePrefix={pricePrefix} />
+                    ))}
+                  </tr>
+                  {rows.map((ind) => (
+                    <tr key={ind.key} className="border-b border-[var(--border)] last:border-none">
+                      <td className="py-2 pr-2 align-top text-[var(--text-secondary)]">
+                        <div>{ind.label}</div>
+                        <div className="mt-0.5">
+                          <Badge tone={RATING_TONE[ind.rating]}>{RATING_LABEL[ind.rating]}</Badge>
+                        </div>
+                      </td>
+                      {ind.points.map((p) => (
+                        <TargetCell key={p.horizonDays} point={p} unitAbbrev={unitAbbrev} pricePrefix={pricePrefix} />
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )
+      })}
+
+      <p className="mt-4 text-xs text-[var(--text-muted)]">
         Jede Zeile überträgt die Bullisch/Bearisch/Neutral-Einstufung des jeweiligen Indikators (siehe Karte oben) in
         eine tägliche Drift-Annahme – Neutral bzw. Indikatoren ohne verfügbare Daten ergeben Drift 0, das Kursziel
         bleibt dort beim aktuellen Kurs – und schreibt sie mit demselben gedämpften Trendmodell wie die
         Zukunftsprojektion fort (Holt-Damped-Trend: die Drift klingt über die Zeit ab, statt unbegrenzt linear
         weiterzulaufen). Die Zone unter dem Zielkurs ist ein mit der Wurzel der Zeit wachsendes Unsicherheitsband
-        (Random-Walk-Näherung), keine Wahrscheinlichkeit. "Gesamt" verwendet denselben Durchschnitts-Score wie das
-        Gesamtfazit oben. <strong>Kein KI-/ML-Modell und keine Anlageberatung</strong> – bei 15 teils
-        widersprüchlichen Indikatoren über vier Horizonte sind große Unterschiede zwischen den Zeilen normal, kein
-        Rechenfehler.
+        (Random-Walk-Näherung), keine Wahrscheinlichkeit. Die beiden "Gesamt"-Zeilen verwenden denselben
+        Durchschnitts-Score wie das jeweilige Gesamtfazit oben. <strong>Kein KI-/ML-Modell und keine
+        Anlageberatung</strong> – bei teils widersprüchlichen Indikatoren über vier Horizonte sind große
+        Unterschiede zwischen den Zeilen normal, kein Rechenfehler.
       </p>
     </Card>
   )

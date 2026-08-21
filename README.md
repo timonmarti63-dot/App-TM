@@ -28,12 +28,15 @@ neueste Schlagzeile als Vorschau.
 - Chart mit SMA 5/20, Bollinger Bändern, eingezeichneter Einstiegszone, Stop-Loss-
   und Take-Profit-Linien, dazu Setup-Richtung (Long/Short), Chance-Risiko-Verhältnis
   (CRV).
-- **Indikatoren & Gesamtfazit**: 15 klassische technische Indikatoren aus vier
-  Kategorien (Trend, Oszillatoren, Volatilität, Volumen), jeder einzeln mit Wert,
-  Bullisch/Bearisch/Neutral-Einstufung und kurzer Begründung, plus ein Gesamtfazit
-  als Durchschnitt aller richtungsgebenden Indikatoren (inkl. RSI-/MACD-Subcharts).
+- **Indikatoren, aufgeteilt in kurzfristig (Trading) und langfristig (Investment)**:
+  15 klassische technische Indikatoren, jeder einzeln mit Wert, Bullisch/Bearisch/
+  Neutral-Einstufung und kurzer Begründung, gruppiert in zwei Blöcke mit je eigenem
+  Gesamtfazit. Auf einen Indikator tippen öffnet direkt darunter seinen eigenen Chart
+  (Kurslinie mit Overlay, eigenständiger Oszillator-Bereich oder Volumen-Histogramm) –
+  so lässt sich nachvollziehen, worauf die Einstufung tatsächlich beruht.
 - **Kursziele (1/3/6/12 Monate)**: Tabelle mit Zielkurs + Unsicherheitszone für jeden
-  der 15 Indikatoren einzeln sowie eine "Gesamt"-Zeile über alle kombiniert.
+  der 15 Indikatoren einzeln, mit je einer eigenen "Gesamt"-Zeile für die kurz- und
+  die langfristige Indikator-Gruppe.
 - **Zukunftsprojektion**: wählbarer Horizont (7/14/30/60/90 Tage), gestrichelte
   Projektionslinie mit gefülltem Unsicherheitsband direkt im Chart, plus Zielwert ±
   Band als Zahl.
@@ -133,7 +136,7 @@ Reale Kurse hängen von Nachrichten, Marktstimmung u.v.m. ab, die dieses Modell 
 kennt – die Zahlen sind eine nachvollziehbare Illustration von Trend und Volatilität,
 keine verlässliche Vorhersage und keine Handelsempfehlung.
 
-### 15 technische Indikatoren & Gesamtfazit (wichtig)
+### 15 technische Indikatoren, kurz-/langfristig getrennt, mit Tap-to-Chart (wichtig)
 
 `src/services/indicators.ts` berechnet klassische, weit verbreitete Kennzahlen (reine
 Arithmetik über die Kerzenreihe des gewählten Zeitraums – Schlusskurse bzw.
@@ -142,17 +145,38 @@ läuft dieselbe Berechnung auf der vollen geladenen Historie (nicht nur den im C
 sichtbaren letzten ~90 Punkten), damit z.B. ADX genug Kerzen zum Einschwingen hat.
 `src/services/indicatorPanel.ts` (`buildIndicatorPanel`) leitet aus jedem Indikator
 eine eigene Bullisch/Bearisch/Neutral-Einstufung nach den in der technischen Analyse
-üblichen Standardregeln ab:
+üblichen Standardregeln ab, plus die vollständige Zeitreihe zur Visualisierung.
 
-**Trend**
+**Tippen zum Nachvollziehen**: In der Vollansicht öffnet ein Antippen eines
+Indikators direkt darunter dessen eigenen Chart – Kurslinie mit den Overlay-Linien
+(z.B. SMA5/SMA20), ein eigenständiger Oszillator-Bereich (z.B. RSI mit den 30/70-
+Schwellen) oder beim Volume Profile ein horizontales Volumen-Histogramm mit
+hervorgehobenem Point of Control. Damit lässt sich für jeden einzelnen Indikator
+sehen, worauf genau seine Einstufung beruht, statt der Zahl blind vertrauen zu
+müssen.
+
+**Kurzfristig vs. langfristig**: Jeder Indikator ist zusätzlich einem von zwei
+Horizonten zugeordnet, mit eigenem Gesamtfazit:
+- **Kurzfristig (Trading, Tage bis Wochen)**: Parabolic SAR, RSI, Stochastik, CCI,
+  Momentum, ATR, VWAP – reaktive Momentum-/Trading-Werkzeuge.
+- **Langfristig (Investment, Wochen bis Monate)**: SMA 5/20, EMA 20, MACD, ADX,
+  Bollinger-Bänder, Keltner-Kanäle, On-Balance Volume, Volume Profile (POC) –
+  Trend-/Strukturwerkzeuge.
+
+Diese Einteilung folgt der in der TA-Praxis üblichen Unterscheidung zwischen
+reaktiven Oszillatoren und Trendfolge-/Strukturwerkzeugen – wie jede Kategorisierung
+eine Vereinfachung, kein Naturgesetz.
+
+**Trend** (alle langfristig)
 - **SMA 5/20** – Kreuzung der beiden gleitenden Durchschnitte (Golden-/Death-Cross).
 - **EMA 20** – Kurs oberhalb/unterhalb des exponentiellen gleitenden Durchschnitts.
 - **MACD(12/26/9)** – MACD-Linie (EMA12−EMA26) über/unter ihrer EMA9-Signallinie.
-- **Parabolic SAR** – iterative Trendfolge-Punkte; Kurs über/unter dem SAR-Punkt.
+- **Parabolic SAR** (kurzfristig) – iterative Trendfolge-Punkte; Kurs über/unter dem
+  SAR-Punkt.
 - **ADX(14)** – Trendstärke (ADX) plus Richtung (+DI/−DI); unter 20 gilt der Trend als
   zu schwach für eine Richtungsaussage.
 
-**Oszillatoren**
+**Oszillatoren** (alle kurzfristig)
 - **RSI(14)** – Wilder-Glättung von Kursgewinnen/-verlusten; unter 30 überverkauft,
   über 70 überkauft.
 - **Stochastik(14,3)** – Position des Kurses in der Hoch-Tief-Spanne; unter 20/über 80
@@ -162,37 +186,39 @@ eine eigene Bullisch/Bearisch/Neutral-Einstufung nach den in der technischen Ana
 - **Momentum(10)** – Kursdifferenz zu vor 10 Kerzen.
 
 **Volatilität**
-- **Bollinger-Bänder(20, 2σ)** – Kurs am unteren/oberen Band = statistisch überdehnt
-  (Gegenbewegungs-Lesart).
-- **ATR(14)** – Wilder-geglättete durchschnittliche Handelsspanne. Reines
-  Volatilitätsmaß ohne Richtung – fließt bewusst **nicht** ins Gesamtfazit ein, die
-  Notiz beschreibt stattdessen, ob die Volatilität gerade steigt oder fällt.
-- **Keltner-Kanäle(20, 2×ATR10)** – Kurs über/unter dem Kanal = Ausbruchssignal
-  (Breakout-Lesart, bewusst anders interpretiert als die Bollinger-Bänder).
+- **Bollinger-Bänder(20, 2σ)** (langfristig) – Kurs am unteren/oberen Band =
+  statistisch überdehnt (Gegenbewegungs-Lesart).
+- **ATR(14)** (kurzfristig) – Wilder-geglättete durchschnittliche Handelsspanne.
+  Reines Volatilitätsmaß ohne Richtung – fließt bewusst **nicht** in ein Gesamtfazit
+  ein, die Notiz beschreibt stattdessen, ob die Volatilität gerade steigt oder fällt.
+- **Keltner-Kanäle(20, 2×ATR10)** (langfristig) – Kurs über/unter dem Kanal =
+  Ausbruchssignal (Breakout-Lesart, bewusst anders interpretiert als die
+  Bollinger-Bänder).
 
 **Volumen**
-- **VWAP** – kumulierter volumengewichteter Durchschnittspreis über das Chart-Fenster
-  (kein reiner Intraday-Session-VWAP, da je nach Zeitraum unterschiedlich lange
-  Fenster angezeigt werden); Kurs darüber/darunter = Käufer/Verkäufer dominieren.
-- **On-Balance Volume** – läuft mit +Volumen an Aufwärts- und −Volumen an
-  Abwärtstagen; angezeigt wird die prozentuale Änderung über die letzten 20 Kerzen
-  (nicht der absolute OBV-Stand, der als reine Kennzahl unbegrenzt und je nach
-  Zeitraum stark negativ oder positiv sein kann, ohne dass das allein etwas über die
-  Richtung aussagt – nur seine Veränderung zählt).
-- **Volume Profile (POC)** – verteilt das Volumen auf Preiszonen; Kurs über/unter dem
-  Point of Control (der volumenstärksten Zone).
+- **VWAP** (kurzfristig) – kumulierter volumengewichteter Durchschnittspreis über das
+  Chart-Fenster (kein reiner Intraday-Session-VWAP, da je nach Zeitraum
+  unterschiedlich lange Fenster angezeigt werden); Kurs darüber/darunter =
+  Käufer/Verkäufer dominieren.
+- **On-Balance Volume** (langfristig) – läuft mit +Volumen an Aufwärts- und
+  −Volumen an Abwärtstagen; angezeigt wird die prozentuale Änderung über die letzten
+  20 Kerzen (nicht der absolute OBV-Stand, der als reine Kennzahl unbegrenzt und je
+  nach Zeitraum stark negativ oder positiv sein kann, ohne dass das allein etwas über
+  die Richtung aussagt – nur seine Veränderung zählt).
+- **Volume Profile (POC)** (langfristig) – verteilt das Volumen auf Preiszonen; Kurs
+  über/unter dem Point of Control (der volumenstärksten Zone).
 - Bei Symbolen ohne Handelsvolumen-Daten (z.B. viele Indizes/Devisen) zeigen alle drei
   Volumen-Indikatoren transparent "keine Daten verfügbar" statt eine Richtung zu
   erfinden.
 
-**Gesamtfazit**: der einfache Durchschnitt über alle Indikatoren, die tatsächlich eine
-Richtung liefern (+1 je Bullisch, −1 je Bearisch, 0 je Neutral) – ATR und Indikatoren
-ohne verfügbare Daten zählen nicht mit. Score über +0,15 gilt als Bullisch, unter
-−0,15 als Bearisch, dazwischen Neutral. Das ist eine transparente
-Mehrheits-/Durchschnittsauswertung regelbasierter Kennzahlen – **kein KI-/ML-Modell,
-keine Gewichtung nach historischer Trefferquote und keine Anlageberatung.** Einzelne
-Indikatoren widersprechen sich in der Praxis häufig; das Gesamtfazit fasst das
-lediglich numerisch zusammen.
+**Gesamtfazit**: für jede der beiden Gruppen der einfache Durchschnitt über die
+Indikatoren dieser Gruppe, die tatsächlich eine Richtung liefern (+1 je Bullisch, −1
+je Bearisch, 0 je Neutral) – ATR und Indikatoren ohne verfügbare Daten zählen nicht
+mit. Score über +0,15 gilt als Bullisch, unter −0,15 als Bearisch, dazwischen
+Neutral. Das ist eine transparente Mehrheits-/Durchschnittsauswertung regelbasierter
+Kennzahlen – **kein KI-/ML-Modell, keine Gewichtung nach historischer Trefferquote
+und keine Anlageberatung.** Einzelne Indikatoren widersprechen sich in der Praxis
+häufig; das Gesamtfazit fasst das lediglich numerisch zusammen.
 
 ### Kursziele für 1/3/6/12 Monate – je Indikator und gesamt (wichtig)
 
@@ -200,8 +226,9 @@ lediglich numerisch zusammen.
 Signalstärke** jedes Indikators aus dem Indikatoren-Panel (`strength`, -1..+1 – nicht
 nur die 3-stufige Bullisch/Bearisch/Neutral-Einstufung) in eine Kurszielzone
 (Zielkurs + Unsicherheitsband) für vier feste Horizonte: 1, 3, 6 und 12 Monate.
-Angezeigt in der Tabelle **"Kursziele (1/3/6/12 Monate)"**, mit einer "Gesamt"-Zeile
-über alle Indikatoren kombiniert plus einer Zeile je Einzelindikator.
+Angezeigt in der Tabelle **"Kursziele (1/3/6/12 Monate)"**, getrennt nach der
+kurzfristigen und der langfristigen Indikator-Gruppe (siehe oben), jeweils mit einer
+eigenen "Gesamt"-Zeile plus einer Zeile je Einzelindikator dieser Gruppe.
 
 - **Signalstärke statt nur 3 Stufen**: jeder Indikator berechnet zusätzlich zu seinem
   Rating, *wie weit* er von seiner Schwelle entfernt ist (z.B. wie weit RSI unter 30
@@ -228,14 +255,17 @@ Angezeigt in der Tabelle **"Kursziele (1/3/6/12 Monate)"**, mit einer "Gesamt"-Z
 - **Unsicherheitszone**: wächst weiterhin mit der Wurzel der Zeit, auch wenn der
   Zielkurs selbst schon konvergiert ist – die Bandbreite der Horizonte 1/3/6/12 Monate
   unterscheidet sich also klar, auch wenn die Mittelwerte gleich aussehen.
-- **"Gesamt"-Zeile**: verwendet den Durchschnitts-`strength`-Wert aller
-  richtungsgebenden Indikatoren (`avgStrength`) – rechnerisch identisch mit dem
-  Mittelwert aller Einzel-Kursziele, weil die gedämpfte Drift linear in ihrer
-  Eingangs-Steigung ist.
+- **Zwei "Gesamt"-Zeilen**: je eine für die kurzfristige und die langfristige Gruppe,
+  jeweils aus dem Durchschnitts-`strength`-Wert der richtungsgebenden Indikatoren
+  dieser Gruppe (`consensusShort.avgStrength` / `consensusLong.avgStrength`) –
+  rechnerisch identisch mit dem Mittelwert der Einzel-Kursziele dieser Gruppe, weil
+  die gedämpfte Drift linear in ihrer Eingangs-Steigung ist. Ein einzelner Konsens
+  über alle 15 zusammen würde die beiden unterschiedlichen Anwendungsfälle (Trading
+  vs. Investment) sonst vermischen.
 
 Wie überall in dieser App: eine transparente statistische Heuristik auf Basis der
 bereits angezeigten Indikator-Einstufungen – **kein KI-/ML-Modell, keine
-Wahrscheinlichkeitsangabe und keine Anlageberatung.** Bei 15 teils widersprüchlichen
+Wahrscheinlichkeitsangabe und keine Anlageberatung.** Bei teils widersprüchlichen
 Indikatoren sind stark abweichende Zielkurse zwischen den Zeilen normal.
 
 ### Wie die Zukunftsprojektion entsteht (statt eines ML-Modells)
@@ -321,10 +351,12 @@ src/
     SymbolSearch.tsx    Freitextsuche mit Live-Vorschlägen
     PriceChart.tsx      Chart-Basis (Kurs, SMA 5/20, Bollinger, optional
                         Entry/SL/TP, optional Projektion+Band)
-    RsiChart.tsx / MacdChart.tsx  Indikator-Subcharts (Teil des Indikatoren-Panels)
     StructureChart.tsx  Chart mit Fibonacci-Levels + nummerierten Elliott-Wellenpunkten
-    IndicatorPanelCard.tsx  Alle 15 Indikatoren gruppiert + Gesamtfazit
-    PriceTargetsCard.tsx  Kursziel-Tabelle je Indikator + gesamt (1/3/6/12 Monate)
+    IndicatorPanelCard.tsx  15 Indikatoren in 2 Tiers (kurz-/langfristig) +
+                            Tap-to-Expand-Zeile je Indikator
+    IndicatorMiniChart.tsx  Chart für genau einen angetippten Indikator
+                            (Kurs-Overlay/Oszillator/Volumen-Histogramm)
+    PriceTargetsCard.tsx  Kursziel-Tabelle je Indikator + je Tier gesamt (1/3/6/12 Monate)
     ChartLegend.tsx
     ui.tsx              Wiederverwendbare UI-Bausteine
   services/
@@ -334,8 +366,9 @@ src/
     indicators.ts     SMA/EMA/RSI/MACD/Bollinger/ATR/ADX/Parabolic SAR/
                       Stochastik/CCI/Momentum/Keltner/VWAP/OBV/Volume Profile
                       – reine Arithmetik
-    indicatorPanel.ts  Bullisch/Bearisch/Neutral je Indikator + Gesamtfazit
-    priceTargets.ts     Kurszielzonen je Indikator + gesamt für 1/3/6/12 Monate
+    indicatorPanel.ts  Bullisch/Bearisch/Neutral + Chart-Zeitreihe je Indikator,
+                       Tier-Zuordnung kurz-/langfristig, je Tier ein Gesamtfazit
+    priceTargets.ts     Kurszielzonen je Indikator + je Tier gesamt für 1/3/6/12 Monate
     damping.ts          Gedämpfte Trendfortschreibung (Holt-Damped-Trend)
     projection.ts        Zukunftsprojektion + Unsicherheitsband
     fibonacci.ts           Fibonacci-Retracement/-Extension-Levels

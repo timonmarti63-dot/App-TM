@@ -35,9 +35,6 @@ export interface Forecast {
   sma20: (number | null)[]
   bbHigh: (number | null)[]
   bbLow: (number | null)[]
-  rsi: (number | null)[]
-  macd: (number | null)[]
-  macdSignal: (number | null)[]
   indicatorPanel: IndicatorPanel
   priceTargets: PriceTargetPanel
   projectionBasis: { currentPrice: number; slopePerHour: number; dailyVolatility: number }

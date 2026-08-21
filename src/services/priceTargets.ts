@@ -1,5 +1,5 @@
 import { dampedDrift } from './damping'
-import type { IndicatorCategory, IndicatorPanel, Rating } from './indicatorPanel'
+import type { IndicatorCategory, IndicatorHorizon, IndicatorPanel, Rating } from './indicatorPanel'
 
 export interface PriceTargetPoint {
   horizonDays: number
@@ -13,13 +13,17 @@ export interface IndicatorPriceForecast {
   key: string
   label: string
   category: IndicatorCategory
+  horizon: IndicatorHorizon
   rating: Rating
   points: PriceTargetPoint[]
 }
 
 export interface PriceTargetPanel {
   perIndicator: IndicatorPriceForecast[]
-  overall: PriceTargetPoint[]
+  /** Kombiniertes Kursziel nur aus den kurzfristigen (Trading-)Indikatoren. */
+  overallShort: PriceTargetPoint[]
+  /** Kombiniertes Kursziel nur aus den langfristigen (Investment-)Indikatoren. */
+  overallLong: PriceTargetPoint[]
 }
 
 const HORIZONS: { days: number; label: string }[] = [
@@ -56,20 +60,25 @@ function buildPoints(currentPrice: number, dailySlope: number, dailyVolatility: 
  * (Holt-Damped-Trend), statt unbegrenzt linear weiterzulaufen. "Gesamt" verwendet den
  * Durchschnitts-`strength`-Wert aller richtungsgebenden Indikatoren (`avgStrength`) –
  * rechnerisch identisch mit dem Mittelwert aller Einzel-Kursziele, weil die gedämpfte
- * Drift linear in ihrer Eingangs-Steigung ist. Wie überall in dieser App: eine
- * transparente statistische Heuristik, **kein KI-/ML-Modell und keine
- * Anlageberatung.**
+ * Drift linear in ihrer Eingangs-Steigung ist. "Gesamt" gibt es getrennt für die
+ * kurzfristigen (Trading-) und langfristigen (Investment-)Indikatoren (siehe
+ * `IndicatorHorizon` in indicatorPanel.ts) – ein Konsens aus allen 15 zusammen würde
+ * die beiden unterschiedlichen Anwendungsfälle sonst vermischen. Wie überall in
+ * dieser App: eine transparente statistische Heuristik, **kein KI-/ML-Modell und
+ * keine Anlageberatung.**
  */
 export function buildPriceTargets(currentPrice: number, dailyVolatility: number, panel: IndicatorPanel): PriceTargetPanel {
   const perIndicator: IndicatorPriceForecast[] = panel.readings.map((r) => ({
     key: r.key,
     label: r.label,
     category: r.category,
+    horizon: r.horizon,
     rating: r.rating,
     points: buildPoints(currentPrice, r.strength * dailyVolatility * DRIFT_FRACTION, dailyVolatility),
   }))
 
-  const overall = buildPoints(currentPrice, panel.consensus.avgStrength * dailyVolatility * DRIFT_FRACTION, dailyVolatility)
+  const overallShort = buildPoints(currentPrice, panel.consensusShort.avgStrength * dailyVolatility * DRIFT_FRACTION, dailyVolatility)
+  const overallLong = buildPoints(currentPrice, panel.consensusLong.avgStrength * dailyVolatility * DRIFT_FRACTION, dailyVolatility)
 
-  return { perIndicator, overall }
+  return { perIndicator, overallShort, overallLong }
 }

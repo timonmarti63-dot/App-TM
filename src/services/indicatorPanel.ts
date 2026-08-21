@@ -1,4 +1,5 @@
 import type { Candle } from './marketData'
+import type { VolumeProfileBin } from './indicators'
 import {
   simpleMovingAverage,
   exponentialMovingAverage,
@@ -19,11 +20,39 @@ import {
 
 export type Rating = 'bullisch' | 'bearisch' | 'neutral'
 export type IndicatorCategory = 'Trend' | 'Oszillator' | 'Volatilität' | 'Volumen'
+/** Trading (Tage bis Wochen) vs. Investment (Wochen bis Monate) – siehe Einteilung unten. */
+export type IndicatorHorizon = 'kurzfristig' | 'langfristig'
+
+export interface ChartLine {
+  key: string
+  label: string
+  color: string
+  values: (number | null)[]
+  dashed?: boolean
+}
+
+export interface ReferenceLineSpec {
+  value: number
+  label?: string
+}
+
+/**
+ * Visualisierungsdaten für genau diesen Indikator, auf dasselbe Kerzenfenster wie
+ * `Forecast.recentCloses` gekürzt (Indizes passen also direkt zusammen). 'price-overlay'
+ * wird über die Kurslinie gelegt (z.B. SMA, Bollinger-Bänder), 'oscillator' bekommt eine
+ * eigene Y-Achse (z.B. RSI, MACD), 'volume-profile' ist ein horizontales Histogramm ohne
+ * Zeitachse.
+ */
+export type IndicatorChart =
+  | { kind: 'price-overlay'; lines: ChartLine[] }
+  | { kind: 'oscillator'; lines: ChartLine[]; domain?: [number, number]; referenceLines?: ReferenceLineSpec[] }
+  | { kind: 'volume-profile'; bins: VolumeProfileBin[]; poc: number }
 
 export interface IndicatorReading {
   key: string
   label: string
   category: IndicatorCategory
+  horizon: IndicatorHorizon
   value: string
   rating: Rating
   /** false = liefert keine Kursrichtung (z.B. ATR misst nur Schwankungsbreite) oder hatte keine Daten – zählt nicht zum Gesamtfazit. */
@@ -37,6 +66,7 @@ export interface IndicatorReading {
    */
   strength: number
   note: string
+  chart: IndicatorChart | null
 }
 
 export interface IndicatorConsensus {
@@ -53,7 +83,12 @@ export interface IndicatorConsensus {
 
 export interface IndicatorPanel {
   readings: IndicatorReading[]
+  /** Gesamtfazit über alle 15 Indikatoren. */
   consensus: IndicatorConsensus
+  /** Gesamtfazit nur über die kurzfristigen (Trading-)Indikatoren. */
+  consensusShort: IndicatorConsensus
+  /** Gesamtfazit nur über die langfristigen (Investment-)Indikatoren. */
+  consensusLong: IndicatorConsensus
 }
 
 function last<T>(arr: (T | null)[]): T | null {
@@ -77,25 +112,49 @@ function distanceStrength(diffPct: number, atrPct: number, atrMultiple: number):
   return clamp(diffPct / (atrPct * atrMultiple))
 }
 
+function buildConsensus(readings: IndicatorReading[]): IndicatorConsensus {
+  const directional = readings.filter((r) => r.directional)
+  const bullishCount = directional.filter((r) => r.rating === 'bullisch').length
+  const bearishCount = directional.filter((r) => r.rating === 'bearisch').length
+  const neutralCount = directional.filter((r) => r.rating === 'neutral').length
+  const scoreSum = directional.reduce((sum, r) => sum + (r.rating === 'bullisch' ? 1 : r.rating === 'bearisch' ? -1 : 0), 0)
+  const score = directional.length > 0 ? scoreSum / directional.length : 0
+  const avgStrength = directional.length > 0 ? directional.reduce((sum, r) => sum + r.strength, 0) / directional.length : 0
+  const rating: Rating = score > 0.15 ? 'bullisch' : score < -0.15 ? 'bearisch' : 'neutral'
+  return { rating, score, avgStrength, bullishCount, bearishCount, neutralCount, directionalCount: directional.length }
+}
+
 /**
  * Berechnet 15 klassische technische Indikatoren (Trend, Oszillatoren, Volatilität,
  * Volumen) über dieselbe Kerzenreihe und leitet aus jedem einzelnen eine
  * Bullisch/Bearisch/Neutral-Einstufung mit kurzer Begründung ab – nach den in der
  * technischen Analyse üblichen Standard-Regeln (Crossover, Überkauft/Überverkauft-
  * Schwellen, Kanal-/Band-Position, Trendstärke). Zusätzlich zur 3-stufigen Einstufung
- * liefert jeder Indikator eine stetige `strength` (-1..+1), abgeleitet aus seinem
- * eigenen Abstand zur jeweiligen Schwelle (z.B. wie weit RSI unter 30 liegt, wie breit
- * der MACD-Abstand zur Signallinie relativ zum Kurs ist) – zwei Indikatoren mit
- * identischem Rating können so unterschiedlich stark ausschlagen. Das Gesamtfazit ist
- * der einfache Durchschnitt über alle Indikatoren, die tatsächlich eine Richtung
- * liefern (ATR z.B. misst nur Volatilität und fließt bewusst nicht in den Durchschnitt
- * ein; Volumen-Indikatoren ohne Handelsvolumen-Daten ebenfalls nicht). Das ist eine
- * transparente Mehrheits-/Durchschnittsauswertung regelbasierter Kennzahlen – **kein
- * KI-/ML-Modell, keine Gewichtung nach historischer Trefferquote und keine
- * Anlageberatung.** Einzelne Indikatoren widersprechen sich in der Praxis häufig; das
- * Gesamtfazit fasst das lediglich numerisch zusammen.
+ * liefert jeder Indikator eine stetige `strength` (-1..+1) und die vollständige
+ * Zeitreihe zur Visualisierung (`chart`, auf `chartPoints` Kerzen gekürzt – dieselbe
+ * Fensterlänge wie `Forecast.recentCloses`, damit sich beides im Chart überlagern
+ * lässt).
+ *
+ * Jeder Indikator ist außerdem einem von zwei Horizonten zugeordnet:
+ * **kurzfristig** (Parabolic SAR, RSI, Stochastik, CCI, Momentum, ATR, VWAP) reagiert
+ * schnell auf Kursänderungen und ist typisch für taktisches Trading über Tage bis
+ * Wochen; **langfristig** (SMA, EMA, MACD, ADX, Bollinger-Bänder, Keltner-Kanäle,
+ * On-Balance Volume, Volume Profile) bildet Trend-/Strukturinformationen über Wochen
+ * bis Monate ab und eignet sich eher zur Einordnung längerfristiger Positionen. Diese
+ * Einteilung folgt der in der TA-Literatur üblichen Unterscheidung zwischen
+ * Trendfolge-/Strukturwerkzeugen und reaktiven Momentum-/Trading-Oszillatoren – wie
+ * jede Kategorisierung ist sie eine Vereinfachung, kein Naturgesetz.
+ *
+ * Das Gesamtfazit (`consensus`, `consensusShort`, `consensusLong`) ist jeweils der
+ * einfache Durchschnitt über die Indikatoren, die tatsächlich eine Richtung liefern
+ * (ATR z.B. misst nur Volatilität und fließt bewusst nicht ein; Volumen-Indikatoren
+ * ohne Handelsvolumen-Daten ebenfalls nicht). Das ist eine transparente
+ * Mehrheits-/Durchschnittsauswertung regelbasierter Kennzahlen – **kein KI-/ML-Modell,
+ * keine Gewichtung nach historischer Trefferquote und keine Anlageberatung.** Einzelne
+ * Indikatoren widersprechen sich in der Praxis häufig; das Gesamtfazit fasst das
+ * lediglich numerisch zusammen.
  */
-export function buildIndicatorPanel(series: Candle[]): IndicatorPanel {
+export function buildIndicatorPanel(series: Candle[], chartPoints: number): IndicatorPanel {
   const closes = series.map((c) => c.close)
   const highs = series.map((c) => c.high)
   const lows = series.map((c) => c.low)
@@ -103,6 +162,7 @@ export function buildIndicatorPanel(series: Candle[]): IndicatorPanel {
   const currentPrice = closes[closes.length - 1]
   const volumeAvailable = volumes.some((v) => v > 0)
   const noVolumeNote = 'Keine Handelsvolumen-Daten für dieses Symbol verfügbar (häufig bei Indizes/Devisen).'
+  const clip = <T,>(arr: T[]): T[] => arr.slice(-chartPoints)
 
   const readings: IndicatorReading[] = []
 
@@ -113,10 +173,12 @@ export function buildIndicatorPanel(series: Candle[]): IndicatorPanel {
   const atrLast = last(atrSeries)
   const atrPct = atrLast !== null && currentPrice > 0 ? atrLast / currentPrice : 0
 
-  // --- Trend ---
+  // --- Trend (alle langfristig) ---
 
-  const sma5Last = last(simpleMovingAverage(closes, 5))
-  const sma20Last = last(simpleMovingAverage(closes, 20))
+  const sma5Full = simpleMovingAverage(closes, 5)
+  const sma20Full = simpleMovingAverage(closes, 20)
+  const sma5Last = last(sma5Full)
+  const sma20Last = last(sma20Full)
   {
     const dataOk = sma5Last !== null && sma20Last !== null
     let rating: Rating = 'neutral'
@@ -133,10 +195,30 @@ export function buildIndicatorPanel(series: Candle[]): IndicatorPanel {
         note = 'SMA5 liegt unter SMA20 (Death-Cross-Struktur) – spricht für eine Fortsetzung des Abwärtstrends.'
       }
     }
-    readings.push({ key: 'sma', label: 'SMA 5/20', category: 'Trend', value: `${num(sma5Last)} / ${num(sma20Last)}`, rating, directional: dataOk, strength, note })
+    readings.push({
+      key: 'sma',
+      label: 'SMA 5/20',
+      category: 'Trend',
+      horizon: 'langfristig',
+      value: `${num(sma5Last)} / ${num(sma20Last)}`,
+      rating,
+      directional: dataOk,
+      strength,
+      note,
+      chart: dataOk
+        ? {
+            kind: 'price-overlay',
+            lines: [
+              { key: 'sma5', label: 'SMA 5', color: 'var(--sma5)', values: clip(sma5Full) },
+              { key: 'sma20', label: 'SMA 20', color: 'var(--sma20)', values: clip(sma20Full) },
+            ],
+          }
+        : null,
+    })
   }
 
-  const ema20Last = last(exponentialMovingAverage(closes, 20))
+  const ema20Full = exponentialMovingAverage(closes, 20)
+  const ema20Last = last(ema20Full)
   {
     const dataOk = ema20Last !== null
     let rating: Rating = 'neutral'
@@ -153,7 +235,18 @@ export function buildIndicatorPanel(series: Candle[]): IndicatorPanel {
         note = 'Kurs notiert unter dem EMA20 – der kurzfristige Trendfilter spricht für weiter fallende Kurse.'
       }
     }
-    readings.push({ key: 'ema', label: 'EMA 20', category: 'Trend', value: num(ema20Last), rating, directional: dataOk, strength, note })
+    readings.push({
+      key: 'ema',
+      label: 'EMA 20',
+      category: 'Trend',
+      horizon: 'langfristig',
+      value: num(ema20Last),
+      rating,
+      directional: dataOk,
+      strength,
+      note,
+      chart: dataOk ? { kind: 'price-overlay', lines: [{ key: 'ema20', label: 'EMA 20', color: 'var(--sma20)', values: clip(ema20Full) }] } : null,
+    })
   }
 
   const macdResult = computeMacd(closes, 12, 26, 9)
@@ -178,15 +271,27 @@ export function buildIndicatorPanel(series: Candle[]): IndicatorPanel {
       key: 'macd',
       label: 'MACD (12/26/9)',
       category: 'Trend',
+      horizon: 'langfristig',
       value: `${num(macdLast, 3)} / ${num(macdSignalLast, 3)}`,
       rating,
       directional: dataOk,
       strength,
       note,
+      chart: dataOk
+        ? {
+            kind: 'oscillator',
+            lines: [
+              { key: 'macd', label: 'MACD', color: 'var(--accent)', values: clip(macdResult.macd) },
+              { key: 'signal', label: 'Signal', color: 'var(--sma5)', values: clip(macdResult.signal) },
+            ],
+            referenceLines: [{ value: 0 }],
+          }
+        : null,
     })
   }
 
-  const sarLast = last(parabolicSar(highs, lows))
+  const sarFull = parabolicSar(highs, lows)
+  const sarLast = last(sarFull)
   {
     const dataOk = sarLast !== null
     let rating: Rating = 'neutral'
@@ -202,7 +307,18 @@ export function buildIndicatorPanel(series: Candle[]): IndicatorPanel {
         note = 'Kurs liegt unter dem Parabolic-SAR-Punkt – Trendfolge-Signal für eine Abwärtsbewegung.'
       }
     }
-    readings.push({ key: 'psar', label: 'Parabolic SAR', category: 'Trend', value: num(sarLast), rating, directional: dataOk, strength, note })
+    readings.push({
+      key: 'psar',
+      label: 'Parabolic SAR',
+      category: 'Trend',
+      horizon: 'kurzfristig',
+      value: num(sarLast),
+      rating,
+      directional: dataOk,
+      strength,
+      note,
+      chart: dataOk ? { kind: 'price-overlay', lines: [{ key: 'sar', label: 'Parabolic SAR', color: 'var(--elliott)', values: clip(sarFull), dashed: true }] } : null,
+    })
   }
 
   const adxResult = averageDirectionalIndex(highs, lows, closes, 14)
@@ -232,17 +348,31 @@ export function buildIndicatorPanel(series: Candle[]): IndicatorPanel {
       key: 'adx',
       label: 'ADX (14)',
       category: 'Trend',
+      horizon: 'langfristig',
       value: `${num(adxLast, 0)} (+DI ${num(diPlusLast, 0)} / -DI ${num(diMinusLast, 0)})`,
       rating,
       directional: dataOk,
       strength,
       note,
+      chart: dataOk
+        ? {
+            kind: 'oscillator',
+            lines: [
+              { key: 'adx', label: 'ADX', color: 'var(--accent)', values: clip(adxResult.adx) },
+              { key: 'diPlus', label: '+DI', color: 'var(--good)', values: clip(adxResult.diPlus) },
+              { key: 'diMinus', label: '-DI', color: 'var(--critical)', values: clip(adxResult.diMinus) },
+            ],
+            domain: [0, 100],
+            referenceLines: [{ value: 20, label: '20' }],
+          }
+        : null,
     })
   }
 
-  // --- Oszillatoren ---
+  // --- Oszillatoren (alle kurzfristig) ---
 
-  const rsiLast = last(relativeStrengthIndex(closes, 14))
+  const rsiFull = relativeStrengthIndex(closes, 14)
+  const rsiLast = last(rsiFull)
   {
     const dataOk = rsiLast !== null
     let rating: Rating = 'neutral'
@@ -259,7 +389,25 @@ export function buildIndicatorPanel(series: Candle[]): IndicatorPanel {
         note = `RSI (${num(rsiLast, 0)}) zeigt einen überkauften Markt – erhöhte Chance auf eine Korrektur nach unten.`
       }
     }
-    readings.push({ key: 'rsi', label: 'RSI (14)', category: 'Oszillator', value: num(rsiLast, 0), rating, directional: dataOk, strength, note })
+    readings.push({
+      key: 'rsi',
+      label: 'RSI (14)',
+      category: 'Oszillator',
+      horizon: 'kurzfristig',
+      value: num(rsiLast, 0),
+      rating,
+      directional: dataOk,
+      strength,
+      note,
+      chart: dataOk
+        ? {
+            kind: 'oscillator',
+            lines: [{ key: 'rsi', label: 'RSI', color: 'var(--sma20)', values: clip(rsiFull) }],
+            domain: [0, 100],
+            referenceLines: [{ value: 30 }, { value: 70 }],
+          }
+        : null,
+    })
   }
 
   const stoch = stochasticOscillator(highs, lows, closes, 14, 3)
@@ -281,10 +429,32 @@ export function buildIndicatorPanel(series: Candle[]): IndicatorPanel {
         note = `Stochastik (%K ${num(kLast, 0)}) im überkauften Bereich – mögliches Verkaufssignal.`
       }
     }
-    readings.push({ key: 'stochastic', label: 'Stochastik (14,3)', category: 'Oszillator', value: `${num(kLast, 0)} / ${num(dLast, 0)}`, rating, directional: dataOk, strength, note })
+    readings.push({
+      key: 'stochastic',
+      label: 'Stochastik (14,3)',
+      category: 'Oszillator',
+      horizon: 'kurzfristig',
+      value: `${num(kLast, 0)} / ${num(dLast, 0)}`,
+      rating,
+      directional: dataOk,
+      strength,
+      note,
+      chart: dataOk
+        ? {
+            kind: 'oscillator',
+            lines: [
+              { key: 'k', label: '%K', color: 'var(--accent)', values: clip(stoch.k) },
+              { key: 'd', label: '%D', color: 'var(--sma5)', values: clip(stoch.d) },
+            ],
+            domain: [0, 100],
+            referenceLines: [{ value: 20 }, { value: 80 }],
+          }
+        : null,
+    })
   }
 
-  const cciLast = last(commodityChannelIndex(highs, lows, closes, 20))
+  const cciFull = commodityChannelIndex(highs, lows, closes, 20)
+  const cciLast = last(cciFull)
   {
     const dataOk = cciLast !== null
     let rating: Rating = 'neutral'
@@ -301,10 +471,28 @@ export function buildIndicatorPanel(series: Candle[]): IndicatorPanel {
         note = `CCI (${num(cciLast, 0)}) unter -100 – starker Abwärtstrend.`
       }
     }
-    readings.push({ key: 'cci', label: 'CCI (20)', category: 'Oszillator', value: num(cciLast, 0), rating, directional: dataOk, strength, note })
+    readings.push({
+      key: 'cci',
+      label: 'CCI (20)',
+      category: 'Oszillator',
+      horizon: 'kurzfristig',
+      value: num(cciLast, 0),
+      rating,
+      directional: dataOk,
+      strength,
+      note,
+      chart: dataOk
+        ? {
+            kind: 'oscillator',
+            lines: [{ key: 'cci', label: 'CCI', color: 'var(--accent)', values: clip(cciFull) }],
+            referenceLines: [{ value: 100 }, { value: -100 }, { value: 0 }],
+          }
+        : null,
+    })
   }
 
-  const momLast = last(computeMomentum(closes, 10))
+  const momFull = computeMomentum(closes, 10)
+  const momLast = last(momFull)
   {
     const dataOk = momLast !== null
     let rating: Rating = 'neutral'
@@ -320,7 +508,20 @@ export function buildIndicatorPanel(series: Candle[]): IndicatorPanel {
         note = 'Momentum negativ – Kurs liegt unter dem Niveau vor 10 Kerzen.'
       }
     }
-    readings.push({ key: 'momentum', label: 'Momentum (10)', category: 'Oszillator', value: num(momLast), rating, directional: dataOk, strength, note })
+    readings.push({
+      key: 'momentum',
+      label: 'Momentum (10)',
+      category: 'Oszillator',
+      horizon: 'kurzfristig',
+      value: num(momLast),
+      rating,
+      directional: dataOk,
+      strength,
+      note,
+      chart: dataOk
+        ? { kind: 'oscillator', lines: [{ key: 'momentum', label: 'Momentum', color: 'var(--accent)', values: clip(momFull) }], referenceLines: [{ value: 0 }] }
+        : null,
+    })
   }
 
   // --- Volatilität ---
@@ -349,11 +550,21 @@ export function buildIndicatorPanel(series: Candle[]): IndicatorPanel {
       key: 'bollinger',
       label: 'Bollinger-Bänder (20, 2σ)',
       category: 'Volatilität',
+      horizon: 'langfristig',
       value: `${num(bbLowLast)} – ${num(bbHighLast)}`,
       rating,
       directional: dataOk,
       strength,
       note,
+      chart: dataOk
+        ? {
+            kind: 'price-overlay',
+            lines: [
+              { key: 'bbHigh', label: 'Bollinger oben', color: 'var(--text-muted)', values: clip(bb.high), dashed: true },
+              { key: 'bbLow', label: 'Bollinger unten', color: 'var(--text-muted)', values: clip(bb.low), dashed: true },
+            ],
+          }
+        : null,
     })
   }
 
@@ -368,7 +579,18 @@ export function buildIndicatorPanel(series: Candle[]): IndicatorPanel {
       else note = `ATR (${num(atrLast)}) liegt nahe seinem Durchschnitt im Zeitraum – Volatilität weitgehend stabil.`
     }
     // ATR misst nur Schwankungsbreite, keine Richtung – bewusst immer neutral, Stärke 0 & nicht-richtungsgebend.
-    readings.push({ key: 'atr', label: 'ATR (14)', category: 'Volatilität', value: num(atrLast), rating: 'neutral', directional: false, strength: 0, note })
+    readings.push({
+      key: 'atr',
+      label: 'ATR (14)',
+      category: 'Volatilität',
+      horizon: 'kurzfristig',
+      value: num(atrLast),
+      rating: 'neutral',
+      directional: false,
+      strength: 0,
+      note,
+      chart: atrLast !== null ? { kind: 'oscillator', lines: [{ key: 'atr', label: 'ATR', color: 'var(--warning)', values: clip(atrSeries) }] } : null,
+    })
   }
 
   const keltner = keltnerChannels(highs, lows, closes, 20, 10, 2)
@@ -395,17 +617,28 @@ export function buildIndicatorPanel(series: Candle[]): IndicatorPanel {
       key: 'keltner',
       label: 'Keltner-Kanäle (20, 2×ATR10)',
       category: 'Volatilität',
+      horizon: 'langfristig',
       value: `${num(keltnerLowLast)} – ${num(keltnerHighLast)}`,
       rating,
       directional: dataOk,
       strength,
       note,
+      chart: dataOk
+        ? {
+            kind: 'price-overlay',
+            lines: [
+              { key: 'keltnerHigh', label: 'Keltner oben', color: 'var(--fib)', values: clip(keltner.high), dashed: true },
+              { key: 'keltnerLow', label: 'Keltner unten', color: 'var(--fib)', values: clip(keltner.low), dashed: true },
+            ],
+          }
+        : null,
     })
   }
 
   // --- Volumen ---
 
-  const vwapLast = last(cumulativeVwap(highs, lows, closes, volumes))
+  const vwapFull = cumulativeVwap(highs, lows, closes, volumes)
+  const vwapLast = last(vwapFull)
   {
     const dataOk = volumeAvailable && vwapLast !== null
     let rating: Rating = 'neutral'
@@ -421,7 +654,18 @@ export function buildIndicatorPanel(series: Candle[]): IndicatorPanel {
         note = 'Kurs notiert unter dem volumengewichteten Durchschnittspreis (VWAP) – Verkäufer dominieren im Schnitt des Zeitraums.'
       }
     }
-    readings.push({ key: 'vwap', label: 'VWAP', category: 'Volumen', value: dataOk ? num(vwapLast) : '–', rating, directional: dataOk, strength, note })
+    readings.push({
+      key: 'vwap',
+      label: 'VWAP',
+      category: 'Volumen',
+      horizon: 'kurzfristig',
+      value: dataOk ? num(vwapLast) : '–',
+      rating,
+      directional: dataOk,
+      strength,
+      note,
+      chart: dataOk ? { kind: 'price-overlay', lines: [{ key: 'vwap', label: 'VWAP', color: 'var(--projection)', values: clip(vwapFull) }] } : null,
+    })
   }
 
   const obvArr = onBalanceVolume(closes, volumes)
@@ -450,11 +694,13 @@ export function buildIndicatorPanel(series: Candle[]): IndicatorPanel {
       key: 'obv',
       label: 'On-Balance Volume',
       category: 'Volumen',
+      horizon: 'langfristig',
       value: dataOk ? `${changePct >= 0 ? '+' : ''}${changePct.toFixed(1)} %` : '–',
       rating,
       directional: dataOk,
       strength,
       note,
+      chart: dataOk ? { kind: 'oscillator', lines: [{ key: 'obv', label: 'OBV', color: 'var(--accent)', values: clip(obvArr) }], referenceLines: [{ value: 0 }] } : null,
     })
   }
 
@@ -476,17 +722,24 @@ export function buildIndicatorPanel(series: Candle[]): IndicatorPanel {
         note = `Kurs notiert unter dem Point of Control (${num(poc)}) – der volumenstärksten Preiszone im Zeitraum.`
       }
     }
-    readings.push({ key: 'volumeProfile', label: 'Volume Profile (POC)', category: 'Volumen', value: dataOk ? num(volProfile!.poc) : '–', rating, directional: dataOk, strength, note })
+    readings.push({
+      key: 'volumeProfile',
+      label: 'Volume Profile (POC)',
+      category: 'Volumen',
+      horizon: 'langfristig',
+      value: dataOk ? num(volProfile!.poc) : '–',
+      rating,
+      directional: dataOk,
+      strength,
+      note,
+      chart: dataOk ? { kind: 'volume-profile', bins: volProfile!.bins, poc: volProfile!.poc } : null,
+    })
   }
 
-  const directional = readings.filter((r) => r.directional)
-  const bullishCount = directional.filter((r) => r.rating === 'bullisch').length
-  const bearishCount = directional.filter((r) => r.rating === 'bearisch').length
-  const neutralCount = directional.filter((r) => r.rating === 'neutral').length
-  const scoreSum = directional.reduce((sum, r) => sum + (r.rating === 'bullisch' ? 1 : r.rating === 'bearisch' ? -1 : 0), 0)
-  const score = directional.length > 0 ? scoreSum / directional.length : 0
-  const avgStrength = directional.length > 0 ? directional.reduce((sum, r) => sum + r.strength, 0) / directional.length : 0
-  const rating: Rating = score > 0.15 ? 'bullisch' : score < -0.15 ? 'bearisch' : 'neutral'
-
-  return { readings, consensus: { rating, score, avgStrength, bullishCount, bearishCount, neutralCount, directionalCount: directional.length } }
+  return {
+    readings,
+    consensus: buildConsensus(readings),
+    consensusShort: buildConsensus(readings.filter((r) => r.horizon === 'kurzfristig')),
+    consensusLong: buildConsensus(readings.filter((r) => r.horizon === 'langfristig')),
+  }
 }

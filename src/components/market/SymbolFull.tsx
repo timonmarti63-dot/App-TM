@@ -189,7 +189,7 @@ export function SymbolFull({
         </Card>
       )}
 
-      {forecast && <IndicatorPanelCard forecast={forecast} />}
+      {forecast && <IndicatorPanelCard forecast={forecast} unitAbbrev={meta.unitAbbrev} pricePrefix={meta.pricePrefix} />}
 
       {forecast && <PriceTargetsCard forecast={forecast} unitAbbrev={meta.unitAbbrev} pricePrefix={meta.pricePrefix} />}
 

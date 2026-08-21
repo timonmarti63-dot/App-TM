@@ -1,7 +1,7 @@
 import type { Candle } from './marketData'
 import type { Forecast } from '../types'
 import { getHoursUntilMarketClose } from '../lib/time'
-import { bollingerBands, macd as computeMacd, relativeStrengthIndex, simpleMovingAverage } from './indicators'
+import { bollingerBands, simpleMovingAverage } from './indicators'
 import { buildIndicatorPanel } from './indicatorPanel'
 import { buildPriceTargets } from './priceTargets'
 import { dampedDrift } from './damping'
@@ -105,12 +105,12 @@ export function computeForecast(symbol: string, series: Candle[], interval: stri
   const sma5Full = simpleMovingAverage(closes, 5)
   const sma20Full = simpleMovingAverage(closes, 20)
   const bb = bollingerBands(closes, 20, 2)
-  const rsiFull = relativeStrengthIndex(closes, 14)
-  const macdResult = computeMacd(closes, 12, 26, 9)
 
   // Läuft auf der vollen, ungekürzten Kerzenreihe (nicht nur den fürs Chart sichtbaren
-  // letzten 90 Punkten) – vor allem ADX und ATR profitieren von mehr Historie.
-  const indicatorPanel = buildIndicatorPanel(series)
+  // letzten 90 Punkten) – vor allem ADX und ATR profitieren von mehr Historie. Die pro
+  // Indikator mitgelieferten Chart-Zeitreihen werden intern auf CHART_POINTS gekürzt,
+  // damit ihre Indizes zu recentCloses passen.
+  const indicatorPanel = buildIndicatorPanel(series, CHART_POINTS)
   const priceTargets = buildPriceTargets(currentPrice, dailyVolatility, indicatorPanel)
 
   const clip = <T,>(arr: T[]) => arr.slice(-CHART_POINTS)
@@ -134,9 +134,6 @@ export function computeForecast(symbol: string, series: Candle[], interval: stri
     sma20: clip(sma20Full),
     bbHigh: clip(bb.high),
     bbLow: clip(bb.low),
-    rsi: clip(rsiFull),
-    macd: clip(macdResult.macd),
-    macdSignal: clip(macdResult.signal),
     indicatorPanel,
     priceTargets,
     projectionBasis: { currentPrice, slopePerHour, dailyVolatility },
