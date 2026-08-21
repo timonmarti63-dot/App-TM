@@ -5,6 +5,7 @@ export function ChartLegend({ variant = 'full' }: { variant?: 'simple' | 'full' 
     { label: 'SMA 20', swatch: 'bg-[var(--sma20)]' },
     ...(variant === 'full'
       ? [
+          { label: 'Bollinger-Bänder', swatch: 'bg-[var(--text-muted)]' },
           { label: 'Einstiegszone', swatch: 'bg-[var(--accent)]/25' },
           { label: 'Stop-Loss', swatch: 'bg-[var(--critical)]' },
           { label: 'Take-Profit', swatch: 'bg-[var(--good)]' },

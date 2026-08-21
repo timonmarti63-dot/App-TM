@@ -1,6 +1,14 @@
 import { Line, LineChart, ReferenceArea, ReferenceLine, ResponsiveContainer, Tooltip, YAxis } from 'recharts'
 import type { Forecast } from '../../types'
 
+const TOOLTIP_LABELS: Record<string, string> = {
+  close: 'Kurs',
+  sma5: 'SMA 5',
+  sma20: 'SMA 20',
+  bbHigh: 'Bollinger oben',
+  bbLow: 'Bollinger unten',
+}
+
 export function PriceChart({
   forecast,
   unitAbbrev,
@@ -12,10 +20,19 @@ export function PriceChart({
   pricePrefix?: string
   variant?: 'simple' | 'full'
 }) {
-  const { recentCloses, sma5, sma20, entryLow, entryHigh, stopLoss, endOfDayEstimate, sevenDayEstimate } = forecast
-  const data = recentCloses.map((close, i) => ({ i, close, sma5: sma5[i] ?? null, sma20: sma20[i] ?? null }))
+  const { recentCloses, sma5, sma20, bbHigh, bbLow, entryLow, entryHigh, stopLoss, endOfDayEstimate, sevenDayEstimate } = forecast
+  const data = recentCloses.map((close, i) => ({
+    i,
+    close,
+    sma5: sma5[i] ?? null,
+    sma20: sma20[i] ?? null,
+    bbHigh: variant === 'full' ? (bbHigh[i] ?? null) : null,
+    bbLow: variant === 'full' ? (bbLow[i] ?? null) : null,
+  }))
 
-  const allValues = variant === 'full' ? [...recentCloses, entryLow, entryHigh, stopLoss, endOfDayEstimate, sevenDayEstimate] : recentCloses
+  const bbValues = variant === 'full' ? [...bbHigh, ...bbLow].filter((v): v is number => v !== null) : []
+  const allValues =
+    variant === 'full' ? [...recentCloses, ...bbValues, entryLow, entryHigh, stopLoss, endOfDayEstimate, sevenDayEstimate] : recentCloses
   const min = Math.min(...allValues)
   const max = Math.max(...allValues)
   const pad = (max - min) * 0.12 || Math.abs(min) * 0.01 || 1
@@ -30,7 +47,7 @@ export function PriceChart({
         <LineChart data={data} margin={{ top: 6, right: 8, bottom: 6, left: 8 }}>
           <YAxis domain={domain} hide />
           <Tooltip
-            formatter={(value, name) => [fmt(Number(value)), name === 'close' ? 'Kurs' : name === 'sma5' ? 'SMA 5' : 'SMA 20']}
+            formatter={(value, name) => [fmt(Number(value)), TOOLTIP_LABELS[String(name)] ?? String(name)]}
             labelFormatter={() => ''}
             contentStyle={{
               background: 'var(--surface-2)',
@@ -47,6 +64,8 @@ export function PriceChart({
               <ReferenceLine y={stopLoss} stroke="var(--critical)" strokeDasharray="4 4" strokeWidth={1.5} />
               <ReferenceLine y={endOfDayEstimate} stroke="var(--good)" strokeDasharray="4 4" strokeWidth={1.5} />
               <ReferenceLine y={sevenDayEstimate} stroke="var(--good)" strokeDasharray="2 3" strokeWidth={1.5} />
+              <Line type="monotone" dataKey="bbHigh" stroke="var(--text-muted)" strokeWidth={1} strokeDasharray="2 2" dot={false} isAnimationActive={false} />
+              <Line type="monotone" dataKey="bbLow" stroke="var(--text-muted)" strokeWidth={1} strokeDasharray="2 2" dot={false} isAnimationActive={false} />
             </>
           )}
 

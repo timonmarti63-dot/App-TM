@@ -1,6 +1,8 @@
 import type { Candle } from './marketData'
 import type { Forecast } from '../types'
 import { getUsMarketClock } from '../lib/time'
+import { bollingerBands, macd as computeMacd, relativeStrengthIndex, simpleMovingAverage } from './indicators'
+import { computeMarketSignal } from './signal'
 
 const CHART_POINTS = 90
 const TRADING_HOURS_PER_DAY = 6.5
@@ -49,24 +51,19 @@ function averageRange(series: Candle[], currentPrice: number): number {
   return ranges.reduce((a, b) => a + b, 0) / ranges.length
 }
 
-/** Gleitender Durchschnitt (Simple Moving Average); null solange nicht genug Historie vorliegt. */
-function simpleMovingAverage(values: number[], window: number): (number | null)[] {
-  return values.map((_, i) => {
-    if (i < window - 1) return null
-    let sum = 0
-    for (let j = i - window + 1; j <= i; j++) sum += values[j]
-    return sum / window
-  })
+function lastValue(values: (number | null)[]): number | null {
+  return values.length > 0 ? values[values.length - 1] : null
 }
 
 /**
- * Trend-Schätzung auf Basis einer linearen Regression der letzten Kurse, plus ein
- * daraus abgeleiteter Trade-Plan (Einstiegszone, Stop-Loss, Chance-Risiko zu den
- * Kurszielen) und zwei gleitende Durchschnitte für den Chart. Das ist eine
+ * Trend-Schätzung auf Basis einer linearen Regression der letzten Kurse, ein daraus
+ * abgeleiteter Trade-Plan (Einstiegszone, Stop-Loss, Chance-Risiko zu den
+ * Kurszielen), die klassischen technischen Indikatoren SMA/RSI/MACD/Bollinger sowie
+ * ein daraus abgeleitetes Bullisch/Bearisch/Neutral-Signal. Das ist eine
  * statistische Fortschreibung des jüngsten Kursmomentums kombiniert mit einer
- * volatilitätsbasierten Risikoabschätzung – keine verlässliche Vorhersage und keine
- * Anlageberatung: reale Kurse hängen von Nachrichten, Marktstimmung u.v.m. ab, die
- * dieses Modell nicht kennt.
+ * volatilitätsbasierten Risikoabschätzung und regelbasierter Kennzahlen-Auswertung –
+ * keine verlässliche Vorhersage und keine Anlageberatung: reale Kurse hängen von
+ * Nachrichten, Marktstimmung u.v.m. ab, die dieses Modell nicht kennt.
  *
  * `interval` ist das Yahoo-Finance-Zeitraster der übergebenen Kerzen (z.B. "30m",
  * "1d", "1wk") – nötig, um die Steigung pro Kerze korrekt in eine Steigung pro
@@ -102,9 +99,22 @@ export function computeForecast(symbol: string, series: Candle[], interval: stri
   const entryMid = (entryLow + entryHigh) / 2
   const risk = Math.abs(entryMid - stopLoss)
 
-  const chartCloses = closes.slice(-CHART_POINTS)
   const sma5Full = simpleMovingAverage(closes, 5)
   const sma20Full = simpleMovingAverage(closes, 20)
+  const bb = bollingerBands(closes, 20, 2)
+  const rsiFull = relativeStrengthIndex(closes, 14)
+  const macdResult = computeMacd(closes, 12, 26, 9)
+
+  const signal = computeMarketSignal({
+    currentPrice,
+    rsi: lastValue(rsiFull),
+    sma5: lastValue(sma5Full),
+    sma20: lastValue(sma20Full),
+    bbHigh: lastValue(bb.high),
+    bbLow: lastValue(bb.low),
+  })
+
+  const clip = <T,>(arr: T[]) => arr.slice(-CHART_POINTS)
 
   return {
     symbol,
@@ -113,9 +123,15 @@ export function computeForecast(symbol: string, series: Candle[], interval: stri
     endOfDayEstimate,
     sevenDayEstimate,
     computedAt: Date.now(),
-    recentCloses: chartCloses,
-    sma5: sma5Full.slice(-CHART_POINTS),
-    sma20: sma20Full.slice(-CHART_POINTS),
+    recentCloses: clip(closes),
+    sma5: clip(sma5Full),
+    sma20: clip(sma20Full),
+    bbHigh: clip(bb.high),
+    bbLow: clip(bb.low),
+    rsi: clip(rsiFull),
+    macd: clip(macdResult.macd),
+    macdSignal: clip(macdResult.signal),
+    signal,
     direction,
     entryLow,
     entryHigh,

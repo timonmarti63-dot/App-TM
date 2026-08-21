@@ -8,6 +8,11 @@ import { useSymbolTimeframeData } from '../../hooks/useSymbolTimeframeData'
 import { Badge, Button, Card, SectionHeading } from '../ui'
 import { PriceChart } from './PriceChart'
 import { ChartLegend } from './ChartLegend'
+import { RsiChart } from './RsiChart'
+import { MacdChart } from './MacdChart'
+
+const RATING_LABEL: Record<string, string> = { bullisch: '▲ Bullisch', bearisch: '▼ Bearisch', neutral: '● Neutral' }
+const RATING_TONE: Record<string, 'good' | 'critical' | 'neutral'> = { bullisch: 'good', bearisch: 'critical', neutral: 'neutral' }
 
 function TradeRow({ label, value, tone }: { label: string; value: string; tone?: 'good' | 'critical' }) {
   const color = tone === 'good' ? 'text-[var(--good-text)]' : tone === 'critical' ? 'text-[var(--critical)]' : 'text-[var(--text-primary)]'
@@ -142,6 +147,34 @@ export function SymbolFull({
             Einstiegszone, Stop-Loss und Chance-Risiko-Verhältnis (CRV) sind statistische Schätzungen aus Kurstrend
             und Schwankungsbreite im gewählten Zeitraum – keine Anlageberatung und keine Garantie für den
             tatsächlichen Kursverlauf. SMA 5/20 sind gleitende Durchschnitte über die letzten 5 bzw. 20 Kerzen.
+          </p>
+        </Card>
+      )}
+
+      {forecast && (
+        <Card className="mb-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-medium text-[var(--text-muted)]">Marktsignal</h3>
+            <Badge tone={RATING_TONE[forecast.signal.rating]}>{RATING_LABEL[forecast.signal.rating]}</Badge>
+          </div>
+          <ul className="mt-2 flex flex-col gap-1 text-sm text-[var(--text-secondary)]">
+            {forecast.signal.details.map((detail) => (
+              <li key={detail} className="flex gap-1.5">
+                <span className="text-[var(--text-muted)]">–</span>
+                {detail}
+              </li>
+            ))}
+          </ul>
+
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <RsiChart rsi={forecast.rsi} />
+            <MacdChart macd={forecast.macd} macdSignal={forecast.macdSignal} />
+          </div>
+
+          <p className="mt-3 text-xs text-[var(--text-muted)]">
+            Regelbasierte Auswertung von RSI(14), SMA5/SMA20-Trendstruktur und Bollinger-Band-Position (je nach
+            Ergebnis ±1 bis ±2 Punkte, ab ±2 gilt die Einstufung Bullisch/Bearisch) – eine Kennzahlen-Zusammenfassung,
+            keine Analyse durch Menschen und keine Anlageberatung.
           </p>
         </Card>
       )}

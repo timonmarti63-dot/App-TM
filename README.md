@@ -24,8 +24,12 @@ neueste Schlagzeile als Vorschau.
 **3. Vollansicht** (nochmal antippen) –
 - Zeitraum wählbar: 1 Tag, 5 Tage, 1 Monat, 3 Monate, 1 Jahr – Chart, Kennzahlen und
   Trade-Setup passen sich dem gewählten Zeitraum an.
-- Chart mit eingezeichneter Einstiegszone, Stop-Loss- und Take-Profit-Linien, dazu
-  Setup-Richtung (Long/Short), Chance-Risiko-Verhältnis (CRV).
+- Chart mit SMA 5/20, Bollinger Bändern, eingezeichneter Einstiegszone, Stop-Loss-
+  und Take-Profit-Linien, dazu Setup-Richtung (Long/Short), Chance-Risiko-Verhältnis
+  (CRV).
+- **Marktsignal**: Bullisch/Bearisch/Neutral-Einstufung aus einem Punktesystem über
+  RSI(14), SMA5/SMA20-Trendstruktur und Bollinger-Band-Position, mit Begründung je
+  Kennzahl sowie RSI- und MACD(12/26/9)-Subcharts.
 - Kennzahlen-Panel: Tagesspanne, 52-Wochen-Spanne, Handelsvolumen.
 - Alle Schlagzeilen der letzten 48 Stunden mit Original-Link, plus eine automatisch
   aus den Schlagzeilen-Titeln zusammengestellte deutsche Kurzfassung.
@@ -117,6 +121,27 @@ Reale Kurse hängen von Nachrichten, Marktstimmung u.v.m. ab, die dieses Modell 
 kennt – die Zahlen sind eine nachvollziehbare Illustration von Trend und Volatilität,
 keine verlässliche Vorhersage und keine Handelsempfehlung.
 
+### Technische Indikatoren & Marktsignal
+
+`src/services/indicators.ts` berechnet klassische, weit verbreitete Kennzahlen (reine
+Arithmetik über die Kursreihe des gewählten Zeitraums, kein externer Dienst):
+
+- **RSI(14)** – Wilder-Glättung von Kursgewinnen/-verlusten, 0-100.
+- **MACD(12/26/9)** – Differenz aus EMA12 und EMA26, plus EMA9 der Differenz als
+  Signallinie.
+- **Bollinger Bänder(20, 2σ)** – SMA20 ± 2 Populations-Standardabweichungen.
+
+`src/services/signal.ts` (`computeMarketSignal`) wertet daraus ein
+Bullisch/Bearisch/Neutral-Signal mit Punktesystem aus: RSI < 30 bzw. > 70 (±1), Kurs
+über/unter SMA5 bei gleichzeitigem SMA5/SMA20-Crossover (±2), Kurs am unteren/oberen
+Bollinger-Band (±1) – ab Score ±2 gilt Bullisch/Bearisch, sonst Neutral. Das ist an
+ein klassisches, öffentlich bekanntes Trader-Schema angelehnt (Golden-Cross-Logik,
+RSI-Überkauft/-Überverkauft, Band-Extreme), verwendet aber SMA5/SMA20 statt SMA50/200
+– bei den hier geladenen Zeitreihen (bis zu ~90-260 Kerzen, je nach Zeitraum) wäre ein
+200er-Fenster oft noch gar nicht berechenbar. Wie bei allen anderen Werten hier gilt:
+eine regelbasierte Kennzahlen-Auswertung, keine Analyse durch Menschen und keine
+Anlageberatung.
+
 ### Schlagzeilen & Zusammenfassung
 
 Die Kurzansicht zeigt bereits die neueste Schlagzeile als Teaser; die Vollansicht
@@ -143,14 +168,18 @@ src/
     SymbolFull.tsx      Vollansicht: Zeitraum, SL/TP-Chart, Kennzahlen,
                         Schlagzeilen + Zusammenfassung (Level 3)
     SymbolSearch.tsx    Freitextsuche mit Live-Vorschlägen
-    PriceChart.tsx      Chart-Basis (Kurs, SMA 5/20, optional Entry/SL/TP)
+    PriceChart.tsx      Chart-Basis (Kurs, SMA 5/20, Bollinger, optional Entry/SL/TP)
+    RsiChart.tsx / MacdChart.tsx  Indikator-Subcharts (nur Vollansicht)
     ChartLegend.tsx
     ui.tsx              Wiederverwendbare UI-Bausteine
   services/
     marketData.ts   Client für /api/quotes, Zeitraum-Definitionen
     newsData.ts      Client für /api/news
     searchData.ts    Client für /api/search
-    forecast.ts       Trend-Prognose, Einstiegszone, Stop-Loss, CRV, SMA
+    indicators.ts     SMA/EMA/RSI/MACD/Bollinger – reine Arithmetik
+    signal.ts          Bullisch/Bearisch/Neutral-Punktesystem
+    forecast.ts         Trend-Prognose, Einstiegszone, Stop-Loss, CRV, bindet
+                        indicators.ts + signal.ts ein
   hooks/
     useMarketData.ts         Stündliches Auto-Refresh der ganzen Watchlist
     useSymbolTimeframeData.ts On-Demand-Refetch für den Zeitraum-Umschalter

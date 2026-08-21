@@ -24,6 +24,14 @@ export interface Quote {
 
 export type TradeDirection = 'long' | 'short'
 
+export type MarketRating = 'bullisch' | 'bearisch' | 'neutral'
+
+export interface MarketSignal {
+  rating: MarketRating
+  score: number
+  details: string[]
+}
+
 export interface Forecast {
   symbol: string
   currentPrice: number
@@ -34,6 +42,12 @@ export interface Forecast {
   recentCloses: number[]
   sma5: (number | null)[]
   sma20: (number | null)[]
+  bbHigh: (number | null)[]
+  bbLow: (number | null)[]
+  rsi: (number | null)[]
+  macd: (number | null)[]
+  macdSignal: (number | null)[]
+  signal: MarketSignal
   direction: TradeDirection
   entryLow: number
   entryHigh: number
