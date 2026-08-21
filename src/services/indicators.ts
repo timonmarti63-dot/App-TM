@@ -1,3 +1,5 @@
+import type { Candle } from './marketData'
+
 /**
  * Klassische technische Indikatoren – reine Arithmetik über Kerzen-Reihen
  * (Schlusskurse bzw. High/Low/Close/Volumen, je nach Indikator).
@@ -299,20 +301,33 @@ export function keltnerChannels(
 }
 
 /**
- * Kumulierter volumengewichteter Durchschnittspreis (VWAP) über die gesamte übergebene
- * Reihe – bei echtem Intraday-VWAP kumuliert man nur innerhalb eines Handelstags; da
- * hier je nach gewähltem Zeitraum unterschiedlich lange Fenster angezeigt werden, ist
- * das eine "Anchored VWAP" über das ganze Chart-Fenster, kein Session-VWAP.
+ * Volumengewichteter Durchschnittspreis (VWAP). Bei `resetDaily=true` (Intraday-
+ * Kerzen wie 5m/30m) setzt sich die Kumulierung an jedem neuen Handelstag zurück –
+ * ein echter Session-VWAP wie im klassischen Daytrading-Einsatz, wo er sich laut
+ * Definition jeden Tag auf null zurücksetzt. Bei `resetDaily=false` (Tages-/
+ * Wochenkerzen, wo ein täglicher Reset bedeutungslos wäre, weil jede Kerze bereits
+ * einen ganzen Tag oder mehr abdeckt) kumuliert er stattdessen über das gesamte
+ * übergebene Fenster ("Anchored VWAP"). Die US-Handelszeiten liegen komplett
+ * innerhalb eines einzelnen UTC-Kalendertags (9:30–16:00 Uhr Eastern = 13:30–21:00
+ * bzw. 14:30–21:00 UTC), daher genügt ein einfacher UTC-Datumsvergleich als
+ * Tagesgrenze, ohne Zeitzonen-Umrechnung.
  */
-export function cumulativeVwap(highs: number[], lows: number[], closes: number[], volumes: number[]): (number | null)[] {
-  const n = closes.length
+export function sessionVwap(series: Candle[], resetDaily: boolean): (number | null)[] {
+  const n = series.length
   const result: (number | null)[] = new Array(n).fill(null)
   let cumPv = 0
   let cumVol = 0
+  let currentDay = ''
   for (let i = 0; i < n; i++) {
-    const typical = (highs[i] + lows[i] + closes[i]) / 3
-    cumPv += typical * volumes[i]
-    cumVol += volumes[i]
+    const day = series[i].datetime.slice(0, 10)
+    if (resetDaily && day !== currentDay) {
+      cumPv = 0
+      cumVol = 0
+      currentDay = day
+    }
+    const typical = (series[i].high + series[i].low + series[i].close) / 3
+    cumPv += typical * series[i].volume
+    cumVol += series[i].volume
     result[i] = cumVol > 0 ? cumPv / cumVol : null
   }
   return result

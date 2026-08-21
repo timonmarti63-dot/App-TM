@@ -1,11 +1,17 @@
 import { useState } from 'react'
 import type { Forecast } from '../../types'
-import type { IndicatorConsensus, IndicatorReading } from '../../services/indicatorPanel'
+import type { IndicatorConsensus, IndicatorHorizon, IndicatorReading } from '../../services/indicatorPanel'
 import { Badge, Card } from '../ui'
 import { IndicatorMiniChart } from './IndicatorMiniChart'
 
 const RATING_LABEL: Record<string, string> = { bullisch: '▲ Bullisch', bearisch: '▼ Bearisch', neutral: '● Neutral' }
 const RATING_TONE: Record<string, 'good' | 'critical' | 'neutral'> = { bullisch: 'good', bearisch: 'critical', neutral: 'neutral' }
+
+const GROUPS: { horizon: IndicatorHorizon; title: string; description: string }[] = [
+  { horizon: 'kurzfristig', title: 'Kurzfristig (Trading)', description: 'Reaktive Momentum-Indikatoren – typisch für Tage.' },
+  { horizon: 'mittelfristig', title: 'Mittelfristig (Swing-Trading)', description: 'Trendbestätigung & Ausbrüche – typisch für Wochen.' },
+  { horizon: 'langfristig', title: 'Langfristig (Investment)', description: 'Struktur-/Positionswerkzeuge – typisch für Wochen bis Monate.' },
+]
 
 function ConsensusSummary({ title, description, consensus }: { title: string; description: string; consensus: IndicatorConsensus }) {
   return (
@@ -70,11 +76,11 @@ function IndicatorRow({
 }
 
 /**
- * Zeigt alle 15 Indikatoren aus buildIndicatorPanel(), aufgeteilt in zwei Gruppen –
- * kurzfristig (Trading) und langfristig (Investment), siehe IndicatorHorizon in
- * indicatorPanel.ts –, jede mit eigenem Gesamtfazit. Tippen auf eine Zeile öffnet die
- * zugehörige Zeitreihe im Chart darunter (Accordion), damit nachvollziehbar ist, wie
- * dieser eine Indikator zu seiner Einstufung kommt.
+ * Zeigt alle 15 Indikatoren aus buildIndicatorPanel(), aufgeteilt in drei Gruppen –
+ * kurzfristig (Trading), mittelfristig (Swing-Trading) und langfristig (Investment),
+ * siehe IndicatorHorizon in indicatorPanel.ts –, jede mit eigenem Gesamtfazit. Tippen
+ * auf eine Zeile öffnet die zugehörige Zeitreihe im Chart darunter (Accordion), damit
+ * nachvollziehbar ist, wie dieser eine Indikator zu seiner Einstufung kommt.
  */
 export function IndicatorPanelCard({
   forecast,
@@ -86,9 +92,12 @@ export function IndicatorPanelCard({
   pricePrefix: string
 }) {
   const [openKey, setOpenKey] = useState<string | null>(null)
-  const { readings, consensusShort, consensusLong } = forecast.indicatorPanel
-  const shortTerm = readings.filter((r) => r.horizon === 'kurzfristig')
-  const longTerm = readings.filter((r) => r.horizon === 'langfristig')
+  const { readings, consensusShort, consensusMedium, consensusLong } = forecast.indicatorPanel
+  const consensusByHorizon: Record<IndicatorHorizon, IndicatorConsensus> = {
+    kurzfristig: consensusShort,
+    mittelfristig: consensusMedium,
+    langfristig: consensusLong,
+  }
 
   const renderList = (list: IndicatorReading[]) => (
     <ul className="flex flex-col">
@@ -110,24 +119,24 @@ export function IndicatorPanelCard({
     <Card className="mb-4">
       <h3 className="mb-3 text-sm font-medium text-[var(--text-muted)]">Indikatoren</h3>
 
-      <ConsensusSummary title="Kurzfristig (Trading)" description="Reaktive Momentum-Indikatoren – typisch für Tage bis Wochen." consensus={consensusShort} />
-      <div className="mt-1">{renderList(shortTerm)}</div>
-
-      <div className="mt-5">
-        <ConsensusSummary title="Langfristig (Investment)" description="Trend-/Strukturindikatoren – typisch für Wochen bis Monate." consensus={consensusLong} />
-      </div>
-      <div className="mt-1">{renderList(longTerm)}</div>
+      {GROUPS.map((group, idx) => (
+        <div key={group.horizon} className={idx > 0 ? 'mt-5' : ''}>
+          <ConsensusSummary title={group.title} description={group.description} consensus={consensusByHorizon[group.horizon]} />
+          <div className="mt-1">{renderList(readings.filter((r) => r.horizon === group.horizon))}</div>
+        </div>
+      ))}
 
       <p className="mt-4 text-xs text-[var(--text-muted)]">
         Tippe auf einen Indikator, um seine zugrunde liegende Zeitreihe im Chart zu sehen. Jeder Indikator wird nach
         seinen in der technischen Analyse üblichen Standardregeln einzeln als bullisch, bearisch oder neutral
-        eingestuft (Crossover, Überkauft-/Überverkauft-Schwellen, Kanal-/Band-Position, Trendstärke). Die beiden
-        Gesamtfazits oben sind der einfache Durchschnitt über die jeweils richtungsgebenden Indikatoren ihrer Gruppe
-        – ATR misst z.B. nur Schwankungsbreite und fließt bewusst nicht ein, Volumen-Indikatoren ohne verfügbare
-        Handelsvolumen-Daten ebenfalls nicht. Das ist eine transparente Mehrheits-/Durchschnittsauswertung
-        regelbasierter Kennzahlen – <strong>kein KI-/ML-Modell</strong>, keine Gewichtung nach historischer
-        Trefferquote und keine Anlageberatung. Die Einteilung in kurz-/langfristig ist eine vereinfachte, in der
-        TA-Praxis übliche Zuordnung, kein Naturgesetz – einzelne Indikatoren widersprechen sich zudem häufig.
+        eingestuft (Crossover, Divergenzen, Überkauft-/Überverkauft-Schwellen, Kanal-/Band-Position, Trendstärke).
+        Die drei Gesamtfazits oben sind der einfache Durchschnitt über die jeweils richtungsgebenden Indikatoren
+        ihrer Gruppe – ATR misst z.B. nur Schwankungsbreite und fließt bewusst nicht ein, Volumen-Indikatoren ohne
+        verfügbare Handelsvolumen-Daten ebenfalls nicht. Das ist eine transparente Mehrheits-/
+        Durchschnittsauswertung regelbasierter Kennzahlen – <strong>kein KI-/ML-Modell</strong>, keine Gewichtung
+        nach historischer Trefferquote und keine Anlageberatung. Die Einteilung in kurz-/mittel-/langfristig ist
+        eine vereinfachte, in der TA-Praxis übliche Zuordnung, kein Naturgesetz – einzelne Indikatoren
+        widersprechen sich zudem häufig.
       </p>
     </Card>
   )

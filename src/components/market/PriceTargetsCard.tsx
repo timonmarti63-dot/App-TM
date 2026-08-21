@@ -21,16 +21,18 @@ function TargetCell({ point, unitAbbrev, pricePrefix }: { point: PriceTargetPoin
 
 /**
  * Tabelle mit Kurszielzone (Zielkurs + Unsicherheitsband) für 1/3/6/12 Monate –
- * getrennt nach kurzfristigen (Trading-) und langfristigen (Investment-)Indikatoren
- * (siehe IndicatorHorizon in indicatorPanel.ts), jeweils mit eigener "Gesamt"-Zeile.
- * Siehe priceTargets.ts für die genaue Berechnung.
+ * getrennt nach kurzfristigen (Trading-), mittelfristigen (Swing-Trading-) und
+ * langfristigen (Investment-)Indikatoren (siehe IndicatorHorizon in
+ * indicatorPanel.ts), jeweils mit eigener "Gesamt"-Zeile. Siehe priceTargets.ts für
+ * die genaue Berechnung.
  */
 export function PriceTargetsCard({ forecast, unitAbbrev, pricePrefix }: { forecast: Forecast; unitAbbrev: string; pricePrefix: string }) {
-  const { perIndicator, overallShort, overallLong } = forecast.priceTargets
-  const { consensusShort, consensusLong } = forecast.indicatorPanel
+  const { perIndicator, overallShort, overallMedium, overallLong } = forecast.priceTargets
+  const { consensusShort, consensusMedium, consensusLong } = forecast.indicatorPanel
 
   const groups: { horizon: IndicatorHorizon; title: string; gesamtLabel: string; overall: PriceTargetPoint[]; rating: string }[] = [
     { horizon: 'kurzfristig', title: 'Kurzfristig (Trading)', gesamtLabel: 'Gesamt (kurzfristig)', overall: overallShort, rating: consensusShort.rating },
+    { horizon: 'mittelfristig', title: 'Mittelfristig (Swing-Trading)', gesamtLabel: 'Gesamt (mittelfristig)', overall: overallMedium, rating: consensusMedium.rating },
     { horizon: 'langfristig', title: 'Langfristig (Investment)', gesamtLabel: 'Gesamt (langfristig)', overall: overallLong, rating: consensusLong.rating },
   ]
 
@@ -87,15 +89,14 @@ export function PriceTargetsCard({ forecast, unitAbbrev, pricePrefix }: { foreca
       })}
 
       <p className="mt-4 text-xs text-[var(--text-muted)]">
-        Jede Zeile überträgt die Bullisch/Bearisch/Neutral-Einstufung des jeweiligen Indikators (siehe Karte oben) in
-        eine tägliche Drift-Annahme – Neutral bzw. Indikatoren ohne verfügbare Daten ergeben Drift 0, das Kursziel
-        bleibt dort beim aktuellen Kurs – und schreibt sie mit demselben gedämpften Trendmodell wie die
-        Zukunftsprojektion fort (Holt-Damped-Trend: die Drift klingt über die Zeit ab, statt unbegrenzt linear
-        weiterzulaufen). Die Zone unter dem Zielkurs ist ein mit der Wurzel der Zeit wachsendes Unsicherheitsband
-        (Random-Walk-Näherung), keine Wahrscheinlichkeit. Die beiden "Gesamt"-Zeilen verwenden denselben
-        Durchschnitts-Score wie das jeweilige Gesamtfazit oben. <strong>Kein KI-/ML-Modell und keine
-        Anlageberatung</strong> – bei teils widersprüchlichen Indikatoren über vier Horizonte sind große
-        Unterschiede zwischen den Zeilen normal, kein Rechenfehler.
+        Jede Zeile überträgt die Signalstärke des jeweiligen Indikators (siehe Karte oben) in eine tägliche
+        Drift-Annahme – Neutral bzw. Indikatoren ohne verfügbare Daten ergeben Drift 0, das Kursziel bleibt dort
+        beim aktuellen Kurs – und schreibt sie gedämpft fort (Holt-Damped-Trend, Halbwertszeit 90 Tage: bei voller
+        Signalstärke sind 1/3/6/12 Monate spürbar unterschiedliche Zielkurse, nicht derselbe Wert). Die Zone unter
+        dem Zielkurs ist ein mit der Wurzel der Zeit wachsendes Unsicherheitsband (Random-Walk-Näherung), keine
+        Wahrscheinlichkeit. Die drei "Gesamt"-Zeilen verwenden denselben Durchschnitts-Score wie das jeweilige
+        Gesamtfazit oben. <strong>Kein KI-/ML-Modell und keine Anlageberatung</strong> – bei teils widersprüchlichen
+        Indikatoren über vier Horizonte sind große Unterschiede zwischen den Zeilen normal, kein Rechenfehler.
       </p>
     </Card>
   )

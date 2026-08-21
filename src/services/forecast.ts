@@ -110,7 +110,7 @@ export function computeForecast(symbol: string, series: Candle[], interval: stri
   // letzten 90 Punkten) – vor allem ADX und ATR profitieren von mehr Historie. Die pro
   // Indikator mitgelieferten Chart-Zeitreihen werden intern auf CHART_POINTS gekürzt,
   // damit ihre Indizes zu recentCloses passen.
-  const indicatorPanel = buildIndicatorPanel(series, CHART_POINTS)
+  const indicatorPanel = buildIndicatorPanel(series, CHART_POINTS, interval)
   const priceTargets = buildPriceTargets(currentPrice, dailyVolatility, indicatorPanel)
 
   const clip = <T,>(arr: T[]) => arr.slice(-CHART_POINTS)
