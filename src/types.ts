@@ -1,9 +1,9 @@
-export type MarketCategory = 'aktie' | 'rohstoff' | 'krypto' | 'index' | 'devise'
+import type { FibonacciAnalysis } from './services/fibonacci'
+import type { ElliottAnalysis } from './services/elliott'
 
 export interface WatchlistSymbol {
   symbol: string
   name: string
-  category: MarketCategory
   unitLabel: string // z.B. "US-Dollar je Feinunze"
   unitAbbrev: string // z.B. "/oz"
   pricePrefix: string // z.B. "$", oder "" für Indexpunkte/Wechselkurse
@@ -14,7 +14,6 @@ export interface Quote {
   price: number
   previousClose: number
   changePercent: number
-  timestamp: number
   dayHigh: number
   dayLow: number
   fiftyTwoWeekHigh: number
@@ -35,10 +34,8 @@ export interface MarketSignal {
 export interface Forecast {
   symbol: string
   currentPrice: number
-  hourlyTrendPct: number
   endOfDayEstimate: number
   sevenDayEstimate: number
-  computedAt: number
   recentCloses: number[]
   sma5: (number | null)[]
   sma20: (number | null)[]
@@ -55,6 +52,8 @@ export interface Forecast {
   stopLoss: number
   riskRewardEod: number | null
   riskRewardSevenDay: number | null
+  fibonacci: FibonacciAnalysis | null
+  elliott: ElliottAnalysis | null
 }
 
 export interface NewsItem {
@@ -74,6 +73,5 @@ export interface MarketSnapshot {
 export interface SearchResult {
   symbol: string
   name: string
-  exchange: string
   quoteType: string
 }

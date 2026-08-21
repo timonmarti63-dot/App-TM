@@ -3,14 +3,10 @@
 Live-Marktübersicht für Aktien, Rohstoffe, Kryptowährungen, Indizes und Devisen –
 mit Charts, technischen Indikatoren, automatisch berechneten Trade-Setups
 (Einstiegszone/Stop-Loss/Take-Profit), einer Zukunftsprojektion mit
-Unsicherheitsband und aktuellen Schlagzeilen. Passwortgeschützt, kein API-Key
-nötig, kein eigener Server zum Betreiben.
+Unsicherheitsband und aktuellen Schlagzeilen. Keine Anmeldung, kein API-Key, kein
+eigener Server zum Betreiben.
 
 ## Features
-
-**0. Login** – die App ist über ein Passwort geschützt (serverseitige, signierte
-Session-Cookie – siehe unten). Ohne gültige Session liefern auch die `/api/…`-Routen
-selbst nur 401, nicht nur die Oberfläche.
 
 **1. Marktübersicht** – Startseite mit:
 - Freitextsuche nach einem beliebigen Symbol weltweit (Aktien, ETFs, Krypto, Indizes,
@@ -38,6 +34,11 @@ neueste Schlagzeile als Vorschau.
 - **Zukunftsprojektion**: wählbarer Horizont (7/14/30/60/90 Tage), gestrichelte
   Projektionslinie mit gefülltem Unsicherheitsband direkt im Chart, plus Zielwert ±
   Band als Zahl.
+- **Fibonacci & Elliott-Wellen**: Retracement-/Extension-Levels (0/23,6/38,2/50/61,8/
+  78,6/100 % sowie 127,2/161,8/261,8 %) als Linien im Chart und als Liste, dazu eine
+  automatische Zigzag-Schwenkpunkterkennung mit Prüfung der drei harten
+  Elliott-Impuls-Regeln (bestanden/nicht bestanden je Regel, nummerierte
+  Wellenpunkte 0–5 im Chart).
 - Kennzahlen-Panel: Tagesspanne, 52-Wochen-Spanne, Handelsvolumen.
 - Alle Schlagzeilen der letzten 48 Stunden mit Original-Link, plus eine automatisch
   aus den Schlagzeilen-Titeln zusammengestellte deutsche Kurzfassung.
@@ -52,21 +53,8 @@ npm install
 npm run dev
 ```
 
-App läuft dann unter `http://localhost:5173`. Ohne `APP_PASSWORD` in einer
-`.env.local`-Datei zeigt der Dev-Server beim Start ein Test-Passwort in der
-Konsole an ("lokales_testpasswort") – zur Bequemlichkeit nur im lokalen
-`npm run dev`, niemals in Produktion.
-
-Für ein echtes Passwort lokal: eine Datei `.env.local` im Projektwurzelverzeichnis
-anlegen mit
-
-```
-APP_PASSWORD=dein-eigenes-passwort
-```
-
-Für ein Deployment (z.B. Vercel): die Umgebungsvariable `APP_PASSWORD` in den
-Projekteinstellungen setzen. **Ist sie dort nicht gesetzt, bleibt die App komplett
-gesperrt** ("fail closed") – kein unbeabsichtigt offenes Deployment.
+App läuft dann unter `http://localhost:5173` – alles funktioniert direkt, ohne
+Account oder Key irgendwo anzulegen.
 
 Build für Deployment:
 
@@ -163,16 +151,6 @@ RSI-Überkauft/-Überverkauft, Band-Extreme), verwendet aber SMA5/SMA20 statt SM
 eine regelbasierte Kennzahlen-Auswertung, keine Analyse durch Menschen und keine
 Anlageberatung.
 
-### Wie der Passwortschutz funktioniert
-
-Kein Datenbank-Login nötig: `api/_lib/auth.js` signiert bei erfolgreichem Login ein
-Token `Ablaufzeit.HMAC-Signatur` mit `APP_PASSWORD` selbst als Schlüssel und setzt es
-als httpOnly-Cookie (24h gültig). Jede der drei Daten-Routen (`quotes`, `news`,
-`search`) prüft dieses Cookie serverseitig, bevor sie irgendetwas ausliefert – die
-API ist also genauso geschützt wie die Oberfläche, nicht nur client-seitig
-versteckt. `api/auth.js` bietet GET (Session prüfen), POST (einloggen) und DELETE
-(abmelden). `vite.config.ts` spiegelt dieselbe Logik für `npm run dev`.
-
 ### Wie die Zukunftsprojektion entsteht (statt eines ML-Modells)
 
 Ein Machine-Learning-Modell wie Prophet läuft nur in Python und würde die
@@ -195,6 +173,37 @@ Explizit **kein KI-/ML-Modell**, keine Bayes'sche Trend-/Saisonalitätszerlegung
 Prophet, keine kalibrierte Wahrscheinlichkeit – eine nachvollziehbare Illustration,
 keine Vorhersage.
 
+### Fibonacci-Levels & Elliott-Wellen (wichtig)
+
+`src/services/fibonacci.ts` und `src/services/elliott.ts` sind zwei klassische
+Chart-Werkzeuge der technischen Analyse – **geometrische/regelbasierte Hilfsmittel,
+keine Vorhersagen und keine Anlageberatung.** Beide laufen auf demselben
+Kerzenfenster wie das angezeigte Chart (bis zu ~90 Kerzen des gewählten Zeitraums).
+
+- **Fibonacci-Retracement/-Extension** (`computeFibonacci`): sucht das höchste Hoch
+  und tiefste Tief im Zeitraum anhand der echten Kerzen-Höchst-/Tiefstwerte (nicht
+  nur Schlusskurse) und berechnet die Standard-Ratios dazwischen –
+  Retracements bei 0/23,6/38,2/50/61,8/78,6/100 %, Extensions bei 127,2/161,8/
+  261,8 %. Die Trendrichtung ergibt sich daraus, welcher der beiden Extrempunkte
+  zeitlich zuerst auftrat. Diese Levels markieren häufig beobachtete
+  Reaktionszonen aus der Trader-Praxis – kein Beweis, dass der Kurs dort tatsächlich
+  reagiert.
+- **Elliott-Wellen-Strukturprüfung** (`analyzeElliott`): ein Zigzag-Algorithmus
+  folgt dem Trend, bis der Kurs um einen (an die jüngste Volatilität angepassten)
+  Schwellenwert vom letzten Extrempunkt abweicht, und markiert diesen als
+  Schwenkpunkt – objektiv und reproduzierbar, aber wie jeder Zigzag empfindlich auf
+  den Schwellenwert. Aus den letzten 6 Schwenkpunkten (Start der Welle 1 bis Ende
+  der Welle 5) prüft die App nur die drei **harten** Elliott-Regeln: Welle 2
+  retraced nicht über den Beginn von Welle 1 hinaus, Welle 3 ist nie die kürzeste
+  von 1/3/5, Welle 4 überschneidet nicht das Kursgebiet von Welle 1. Das ist eine
+  objektive Strukturprüfung, **keine vollständige Elliott-Wellen-Analyse** – eine
+  vollständige Analyse würde zusätzlich Fibonacci-Längenverhältnisse zwischen
+  Wellen, Wellengrad-Verschachtelung und das Alternations-Prinzip einbeziehen und
+  erfordert in der Praxis erhebliche subjektive Interpretation. Werden zu wenige
+  oder nicht sauber alternierende Schwenkpunkte gefunden (z.B. bei kurzen
+  Zeiträumen wie 1 Tag), zeigt die App das transparent an, statt eine Struktur zu
+  erzwingen.
+
 ### Schlagzeilen & Zusammenfassung
 
 Die Kurzansicht zeigt bereits die neueste Schlagzeile als Teaser; die Vollansicht
@@ -210,40 +219,37 @@ Bündelung der Titel, keine inhaltliche Einordnung.
 
 ```
 api/
-  auth.js           Serverlose Function – Login/Logout/Session-Check
-  quotes.js          Serverlose Function – Kurse/Historie/Kennzahlen
-  news.js             Serverlose Function – Schlagzeilen
-  search.js           Serverlose Function – Symbolsuche
-  _lib/
-    yahoo.js           Fetch- & Parse-Logik für alle Yahoo-Finance-Endpunkte
-    auth.js             Session-Token signieren/prüfen (HMAC, kein DB nötig)
+  quotes.js        Serverlose Function – Kurse/Historie/Kennzahlen, ohne API-Key
+  news.js           Serverlose Function – Schlagzeilen, ohne API-Key
+  search.js         Serverlose Function – Symbolsuche, ohne API-Key
+  _lib/yahoo.js     Fetch- & Parse-Logik für alle drei Yahoo-Finance-Endpunkte
 src/
-  components/
-    Login.tsx           Passwort-Maske
-    market/
-      SymbolTable.tsx    Kategorie-/Watchlist-Tabelle (Level 1)
-      SymbolPreview.tsx   Kurzansicht: Chart + Prognose + 1 Schlagzeile (Level 2)
-      SymbolFull.tsx      Vollansicht: Zeitraum, SL/TP-Chart, Marktsignal,
-                          Projektion, Kennzahlen, Schlagzeilen (Level 3)
-      SymbolSearch.tsx    Freitextsuche mit Live-Vorschlägen
-      PriceChart.tsx      Chart-Basis (Kurs, SMA 5/20, Bollinger, optional
-                          Entry/SL/TP, optional Projektion+Band)
-      RsiChart.tsx / MacdChart.tsx  Indikator-Subcharts (nur Vollansicht)
-      ChartLegend.tsx
-    ui.tsx                Wiederverwendbare UI-Bausteine
+  components/market/
+    SymbolTable.tsx    Kategorie-/Watchlist-Tabelle (Level 1)
+    SymbolPreview.tsx   Kurzansicht: Chart + Prognose + 1 Schlagzeile (Level 2)
+    SymbolFull.tsx      Vollansicht: Zeitraum, SL/TP-Chart, Marktsignal,
+                        Projektion, Kennzahlen, Schlagzeilen (Level 3)
+    SymbolSearch.tsx    Freitextsuche mit Live-Vorschlägen
+    PriceChart.tsx      Chart-Basis (Kurs, SMA 5/20, Bollinger, optional
+                        Entry/SL/TP, optional Projektion+Band)
+    RsiChart.tsx / MacdChart.tsx  Indikator-Subcharts (nur Vollansicht)
+    StructureChart.tsx  Chart mit Fibonacci-Levels + nummerierten Elliott-Wellenpunkten
+    ChartLegend.tsx
+    ui.tsx              Wiederverwendbare UI-Bausteine
   services/
-    authData.ts     Client für /api/auth
-    marketData.ts    Client für /api/quotes, Zeitraum-Definitionen
-    newsData.ts       Client für /api/news
-    searchData.ts     Client für /api/search
-    indicators.ts      SMA/EMA/RSI/MACD/Bollinger – reine Arithmetik
-    signal.ts           Bullisch/Bearisch/Neutral-Punktesystem
-    damping.ts           Gedämpfte Trendfortschreibung (Holt-Damped-Trend)
-    projection.ts         Zukunftsprojektion + Unsicherheitsband
-    forecast.ts            Trend-Prognose, Einstiegszone, Stop-Loss, CRV,
-                           bindet indicators/signal/damping/projection ein
+    marketData.ts   Client für /api/quotes, Zeitraum-Definitionen
+    newsData.ts      Client für /api/news
+    searchData.ts    Client für /api/search
+    indicators.ts     SMA/EMA/RSI/MACD/Bollinger – reine Arithmetik
+    signal.ts          Bullisch/Bearisch/Neutral-Punktesystem
+    damping.ts          Gedämpfte Trendfortschreibung (Holt-Damped-Trend)
+    projection.ts        Zukunftsprojektion + Unsicherheitsband
+    fibonacci.ts           Fibonacci-Retracement/-Extension-Levels
+    elliott.ts               Zigzag-Schwenkpunkte + Elliott-Impuls-Regelcheck
+    forecast.ts           Trend-Prognose, Einstiegszone, Stop-Loss, CRV,
+                          bindet indicators/signal/damping/projection/
+                          fibonacci/elliott ein
   hooks/
-    useAuth.ts                 Login-Status, login()/logout()
     useMarketData.ts            Stündliches Auto-Refresh der ganzen Watchlist
     useSymbolTimeframeData.ts    On-Demand-Refetch für den Zeitraum-Umschalter
     useSymbolNews.ts              Lädt Schlagzeilen einmal je Symbol
@@ -255,5 +261,5 @@ src/
     report.ts     2-Tage-Filter + regelbasierte Schlagzeilen-Zusammenfassung
     symbolMeta.ts  Leitet Anzeige-Metadaten aus Suchtreffern ab
     format.ts      Preis-/Prozent-/Volumen-Formatierung
-vite.config.ts    Spiegelt alle api/*.js-Routen als Dev-Middleware, inkl. Auth
+vite.config.ts    Spiegelt api/quotes.js, api/news.js, api/search.js als Dev-Middleware
 ```

@@ -11,10 +11,12 @@ import { PriceChart } from './PriceChart'
 import { ChartLegend } from './ChartLegend'
 import { RsiChart } from './RsiChart'
 import { MacdChart } from './MacdChart'
+import { StructureChart } from './StructureChart'
 
 const RATING_LABEL: Record<string, string> = { bullisch: '▲ Bullisch', bearisch: '▼ Bearisch', neutral: '● Neutral' }
 const RATING_TONE: Record<string, 'good' | 'critical' | 'neutral'> = { bullisch: 'good', bearisch: 'critical', neutral: 'neutral' }
 const HORIZON_OPTIONS = [7, 14, 30, 60, 90]
+const WAVE_LABELS = ['0', '1', '2', '3', '4', '5']
 
 function TradeRow({ label, value, tone }: { label: string; value: string; tone?: 'good' | 'critical' }) {
   const color = tone === 'good' ? 'text-[var(--good-text)]' : tone === 'critical' ? 'text-[var(--critical)]' : 'text-[var(--text-primary)]'
@@ -214,6 +216,91 @@ export function SymbolFull({
             Ergebnis ±1 bis ±2 Punkte, ab ±2 gilt die Einstufung Bullisch/Bearisch) – eine Kennzahlen-Zusammenfassung,
             keine Analyse durch Menschen und keine Anlageberatung.
           </p>
+        </Card>
+      )}
+
+      {forecast && (
+        <Card className="mb-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm font-medium text-[var(--text-muted)]">Fibonacci & Elliott-Wellen</h3>
+            <div className="flex flex-wrap gap-1.5">
+              {forecast.fibonacci && (
+                <Badge tone="neutral">{forecast.fibonacci.direction === 'up' ? '▲ Aufwärtsbewegung' : '▼ Abwärtsbewegung'}</Badge>
+              )}
+              {forecast.elliott && (
+                <Badge tone={forecast.elliott.validImpulse ? 'good' : 'warning'}>
+                  {forecast.elliott.validImpulse ? '✓ Gültige Impuls-Struktur' : '✗ Keine gültige 5-Wellen-Struktur'}
+                </Badge>
+              )}
+            </div>
+          </div>
+
+          {forecast.fibonacci || forecast.elliott ? (
+            <>
+              <div className="mt-3">
+                <StructureChart forecast={forecast} unitAbbrev={meta.unitAbbrev} pricePrefix={meta.pricePrefix} />
+              </div>
+
+              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {forecast.fibonacci && (
+                  <div>
+                    <div className="mb-1.5 text-[11px] font-medium text-[var(--text-muted)]">
+                      Fibonacci-Levels ({formatCurrency(forecast.fibonacci.swingLow, undefined, meta.pricePrefix)} –{' '}
+                      {formatCurrency(forecast.fibonacci.swingHigh, undefined, meta.pricePrefix)})
+                    </div>
+                    <ul className="flex flex-col divide-y divide-[var(--border)] text-sm">
+                      {forecast.fibonacci.retracements.map((level) => (
+                        <li key={`ret-${level.ratio}`} className="flex items-center justify-between py-1">
+                          <span className="text-[var(--text-muted)]">Retracement {(level.ratio * 100).toFixed(1)} %</span>
+                          <span className="font-mono text-[var(--text-primary)]">{formatCurrency(level.price, undefined, meta.pricePrefix)}</span>
+                        </li>
+                      ))}
+                      {forecast.fibonacci.extensions.map((level) => (
+                        <li key={`ext-${level.ratio}`} className="flex items-center justify-between py-1">
+                          <span className="text-[var(--text-muted)]">Extension {(level.ratio * 100).toFixed(1)} %</span>
+                          <span className="font-mono text-[var(--text-primary)]">{formatCurrency(level.price, undefined, meta.pricePrefix)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {forecast.elliott && (
+                  <div>
+                    <div className="mb-1.5 text-[11px] font-medium text-[var(--text-muted)]">Elliott-Impuls-Regeln (Wellen 0–5)</div>
+                    <ul className="flex flex-col gap-1.5 text-sm">
+                      {forecast.elliott.rules.map((rule) => (
+                        <li key={rule.label} className="flex items-start gap-1.5">
+                          <span className={rule.passed ? 'text-[var(--good-text)]' : 'text-[var(--critical)]'}>{rule.passed ? '✓' : '✗'}</span>
+                          <span className="text-[var(--text-secondary)]">{rule.label}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <div className="mt-2 flex flex-wrap gap-1 text-xs text-[var(--text-muted)]">
+                      {forecast.elliott.points.map((point, idx) => (
+                        <span key={point.index} className="rounded bg-[var(--surface-2)] px-1.5 py-0.5 font-mono">
+                          {WAVE_LABELS[idx]}: {formatCurrency(point.price, undefined, meta.pricePrefix)}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <p className="mt-3 text-xs text-[var(--text-muted)]">
+                Fibonacci-Levels sind rein geometrische Verhältnisse zwischen dem höchsten Hoch und tiefsten Tief im
+                angezeigten Zeitraum – häufig beobachtete Reaktionszonen, keine garantierten Wendepunkte. Die
+                Elliott-Wellen-Prüfung erkennt Schwenkpunkte automatisch per Zigzag-Algorithmus und testet nur die
+                drei harten Elliott-Regeln (Welle 2 nicht über Wellenbeginn 1 hinaus, Welle 3 nicht die kürzeste,
+                Welle 4 ohne Überschneidung mit Welle 1) – <strong>keine vollständige, subjektive Wellenanalyse</strong>{' '}
+                und keine Anlageberatung.
+              </p>
+            </>
+          ) : (
+            <p className="mt-2 text-sm text-[var(--text-muted)]">
+              Nicht genug Kursdaten im gewählten Zeitraum für eine Fibonacci-/Elliott-Analyse. Größeren Zeitraum wählen.
+            </p>
+          )}
         </Card>
       )}
 

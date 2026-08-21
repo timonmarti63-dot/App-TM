@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useMarketData } from '../../hooks/useMarketData'
 import { useSymbolNews } from '../../hooks/useSymbolNews'
 import { useFavorites } from '../../hooks/useFavorites'
-import { ALL_WATCHLIST, STOCK_WATCHLIST, COMMODITY_WATCHLIST, CRYPTO_WATCHLIST, INDEX_WATCHLIST, FOREX_WATCHLIST, CATEGORY_META } from '../../data/watchlist'
+import { ALL_WATCHLIST, STOCK_WATCHLIST, COMMODITY_WATCHLIST, CRYPTO_WATCHLIST, INDEX_WATCHLIST, FOREX_WATCHLIST } from '../../data/watchlist'
 import type { WatchlistSymbol } from '../../types'
 import { Button, Card, SectionHeading } from '../ui'
 import { SymbolTable } from './SymbolTable'
@@ -13,11 +13,11 @@ import { SymbolSearch } from './SymbolSearch'
 type View = 'list' | 'preview' | 'full'
 
 const CATEGORY_LISTS = [
-  { category: 'aktie' as const, list: STOCK_WATCHLIST },
-  { category: 'rohstoff' as const, list: COMMODITY_WATCHLIST },
-  { category: 'krypto' as const, list: CRYPTO_WATCHLIST },
-  { category: 'index' as const, list: INDEX_WATCHLIST },
-  { category: 'devise' as const, list: FOREX_WATCHLIST },
+  { key: 'aktie', title: 'Aktien', subtitle: 'Top 5 Tagesgewinner aus der Beobachtungsliste', list: STOCK_WATCHLIST },
+  { key: 'rohstoff', title: 'Rohstoffe', subtitle: 'Top 5 Tagesgewinner – echte Terminkontrakt-Preise', list: COMMODITY_WATCHLIST },
+  { key: 'krypto', title: 'Kryptowährungen', subtitle: 'Top 5 Tagesgewinner, in US-Dollar', list: CRYPTO_WATCHLIST },
+  { key: 'index', title: 'Indizes', subtitle: 'Top 5 Tagesgewinner – Aktienindizes weltweit', list: INDEX_WATCHLIST },
+  { key: 'devise', title: 'Devisen', subtitle: 'Top 5 Tagesgewinner unter den beobachteten Währungspaaren', list: FOREX_WATCHLIST },
 ]
 
 export function MarketPage() {
@@ -124,11 +124,11 @@ export function MarketPage() {
           />
         )}
 
-        {CATEGORY_LISTS.map(({ category, list }) => (
+        {CATEGORY_LISTS.map(({ key, title, subtitle, list }) => (
           <SymbolTable
-            key={category}
-            title={CATEGORY_META[category].title}
-            subtitle={CATEGORY_META[category].subtitle}
+            key={key}
+            title={title}
+            subtitle={subtitle}
             watchlist={list}
             snapshot={snapshot}
             isFavorite={isFavorite}

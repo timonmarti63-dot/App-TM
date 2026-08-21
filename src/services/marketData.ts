@@ -1,3 +1,5 @@
+import type { Quote } from '../types'
+
 export interface Candle {
   datetime: string
   close: number
@@ -17,6 +19,21 @@ export interface QuoteWithSeries {
   fiftyTwoWeekLow: number
   volume: number
   series: Candle[]
+}
+
+/** Extrahiert die reinen Anzeige-Kennzahlen aus einer API-Antwort (ohne die Kurshistorie). */
+export function toQuote(r: QuoteWithSeries): Quote {
+  return {
+    symbol: r.symbol,
+    price: r.price,
+    previousClose: r.previousClose,
+    changePercent: r.changePercent,
+    dayHigh: r.dayHigh,
+    dayLow: r.dayLow,
+    fiftyTwoWeekHigh: r.fiftyTwoWeekHigh,
+    fiftyTwoWeekLow: r.fiftyTwoWeekLow,
+    volume: r.volume,
+  }
 }
 
 export interface Timeframe {

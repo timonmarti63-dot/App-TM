@@ -1,9 +1,11 @@
 import type { Candle } from './marketData'
 import type { Forecast } from '../types'
-import { getUsMarketClock } from '../lib/time'
+import { getHoursUntilMarketClose } from '../lib/time'
 import { bollingerBands, macd as computeMacd, relativeStrengthIndex, simpleMovingAverage } from './indicators'
 import { computeMarketSignal } from './signal'
 import { dampedDrift } from './damping'
+import { computeFibonacci } from './fibonacci'
+import { analyzeElliott } from './elliott'
 
 const CHART_POINTS = 90
 const TRADING_HOURS_PER_DAY = 6.5
@@ -77,7 +79,7 @@ export function computeForecast(symbol: string, series: Candle[], interval: stri
   const slopePerCandle = linearRegressionSlope(closes)
   const slopePerHour = slopePerCandle / candleHours(interval)
 
-  const { hoursUntilClose } = getUsMarketClock()
+  const hoursUntilClose = getHoursUntilMarketClose()
   const dailySlope = slopePerHour * TRADING_HOURS_PER_DAY
   const endOfDayEstimate = currentPrice + dampedDrift(dailySlope, hoursUntilClose / TRADING_HOURS_PER_DAY)
   const sevenDayEstimate = currentPrice + dampedDrift(dailySlope, 7)
@@ -120,13 +122,20 @@ export function computeForecast(symbol: string, series: Candle[], interval: stri
 
   const clip = <T,>(arr: T[]) => arr.slice(-CHART_POINTS)
 
+  // Fibonacci/Elliott laufen auf demselben Kerzenfenster wie das Chart (recentCloses), damit
+  // ihre Indizes direkt zu den angezeigten Kursen passen. Der Zigzag-Schwellenwert für Elliott
+  // orientiert sich an der jüngsten Volatilität (avgRange/currentPrice), statt fix zu sein –
+  // in ruhigen Märkten reagiert er empfindlicher auf Schwenkpunkte, in volatilen gröber.
+  const structureSeries = clip(series)
+  const elliottThreshold = Math.min(0.08, Math.max(0.02, (avgRange / currentPrice) * 3))
+  const fibonacci = computeFibonacci(structureSeries)
+  const elliott = analyzeElliott(structureSeries, elliottThreshold)
+
   return {
     symbol,
     currentPrice,
-    hourlyTrendPct: currentPrice !== 0 ? (slopePerHour / currentPrice) * 100 : 0,
     endOfDayEstimate,
     sevenDayEstimate,
-    computedAt: Date.now(),
     recentCloses: clip(closes),
     sma5: clip(sma5Full),
     sma20: clip(sma20Full),
@@ -143,5 +152,7 @@ export function computeForecast(symbol: string, series: Candle[], interval: stri
     stopLoss,
     riskRewardEod: risk > 0 ? Math.abs(endOfDayEstimate - entryMid) / risk : null,
     riskRewardSevenDay: risk > 0 ? Math.abs(sevenDayEstimate - entryMid) / risk : null,
+    fibonacci,
+    elliott,
   }
 }

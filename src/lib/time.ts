@@ -10,10 +10,12 @@ export function formatRelativeTime(timestampMs: number, now: number = Date.now()
 }
 
 /**
- * US-Handelszeiten (NYSE, 9:30-16:00 America/New_York), Mo-Fr.
- * Feiertage werden nicht berücksichtigt (kann an echten Feiertagen leicht abweichen).
+ * Verbleibende Stunden bis Handelsschluss (NYSE, 9:30-16:00 America/New_York),
+ * Mo-Fr. Feiertage werden nicht berücksichtigt (kann an echten Feiertagen leicht
+ * abweichen). Außerhalb der Handelszeit wird eine volle Handelssitzung (6,5h) als
+ * Näherung für "bis zum nächsten Handelsschluss" angenommen.
  */
-export function getUsMarketClock(now: Date = new Date()) {
+export function getHoursUntilMarketClose(now: Date = new Date()): number {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/New_York',
     hour12: false,
@@ -25,24 +27,16 @@ export function getUsMarketClock(now: Date = new Date()) {
 
   const get = (type: string) => parts.find((p) => p.type === type)?.value ?? ''
   const weekday = get('weekday')
-  const hour = Number(get('hour'))
-  const minute = Number(get('minute'))
-  const second = Number(get('second'))
-
-  const minutesNow = hour * 60 + minute + second / 60
+  const minutesNow = Number(get('hour')) * 60 + Number(get('minute')) + Number(get('second')) / 60
   const openMinutes = 9 * 60 + 30
   const closeMinutes = 16 * 60
   const isWeekday = !['Sat', 'Sun'].includes(weekday)
-  const isOpen = isWeekday && minutesNow >= openMinutes && minutesNow < closeMinutes
 
-  let hoursUntilClose = 0
-  if (isOpen) {
-    hoursUntilClose = (closeMinutes - minutesNow) / 60
-  } else if (isWeekday && minutesNow < openMinutes) {
-    hoursUntilClose = (closeMinutes - openMinutes) / 60
-  } else {
-    hoursUntilClose = 6.5
+  if (isWeekday && minutesNow >= openMinutes && minutesNow < closeMinutes) {
+    return (closeMinutes - minutesNow) / 60
   }
-
-  return { isOpen, hoursUntilClose, weekday, hour, minute }
+  if (isWeekday && minutesNow < openMinutes) {
+    return (closeMinutes - openMinutes) / 60
+  }
+  return 6.5
 }

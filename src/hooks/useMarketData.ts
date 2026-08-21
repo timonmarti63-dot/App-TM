@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ALL_WATCHLIST } from '../data/watchlist'
 import type { MarketSnapshot, Quote, WatchlistSymbol } from '../types'
-import { DEFAULT_TIMEFRAME, fetchQuotesWithSeries } from '../services/marketData'
+import { DEFAULT_TIMEFRAME, fetchQuotesWithSeries, toQuote } from '../services/marketData'
 import { computeForecast } from '../services/forecast'
 import { useLocalStorage } from './useLocalStorage'
 
@@ -45,18 +45,7 @@ export function useMarketData(extraSymbols: WatchlistSymbol[] = []) {
 
       const quotes: Record<string, Quote> = {}
       for (const [symbol, r] of Object.entries(results)) {
-        quotes[symbol] = {
-          symbol,
-          price: r.price,
-          previousClose: r.previousClose,
-          changePercent: r.changePercent,
-          timestamp: r.timestamp,
-          dayHigh: r.dayHigh,
-          dayLow: r.dayLow,
-          fiftyTwoWeekHigh: r.fiftyTwoWeekHigh,
-          fiftyTwoWeekLow: r.fiftyTwoWeekLow,
-          volume: r.volume,
-        }
+        quotes[symbol] = toQuote(r)
       }
 
       // Die Kurshistorie ist ohnehin schon für alle Symbole geladen (ein Request je

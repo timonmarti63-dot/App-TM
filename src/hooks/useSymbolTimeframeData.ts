@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { Forecast, Quote } from '../types'
-import { type Timeframe, fetchQuotesWithSeries } from '../services/marketData'
+import { type Timeframe, fetchQuotesWithSeries, toQuote } from '../services/marketData'
 import { computeForecast } from '../services/forecast'
 
 interface TimeframeState {
@@ -31,19 +31,7 @@ export function useSymbolTimeframeData(symbol: string, timeframe: Timeframe): Ti
           return
         }
         const forecast = computeForecast(symbol, r.series, timeframe.interval)
-        const quote: Quote = {
-          symbol,
-          price: r.price,
-          previousClose: r.previousClose,
-          changePercent: r.changePercent,
-          timestamp: r.timestamp,
-          dayHigh: r.dayHigh,
-          dayLow: r.dayLow,
-          fiftyTwoWeekHigh: r.fiftyTwoWeekHigh,
-          fiftyTwoWeekLow: r.fiftyTwoWeekLow,
-          volume: r.volume,
-        }
-        setState({ quote, forecast, loading: false, error: null })
+        setState({ quote: toQuote(r), forecast, loading: false, error: null })
       })
       .catch((err) => {
         if (!cancelled) setState({ quote: null, forecast: null, loading: false, error: err instanceof Error ? err.message : 'Unbekannter Fehler' })

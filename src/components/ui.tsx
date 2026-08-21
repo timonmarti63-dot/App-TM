@@ -1,11 +1,4 @@
-import type {
-  ButtonHTMLAttributes,
-  HTMLAttributes,
-  InputHTMLAttributes,
-  ReactNode,
-  SelectHTMLAttributes,
-  TextareaHTMLAttributes,
-} from 'react'
+import type { ButtonHTMLAttributes, HTMLAttributes, InputHTMLAttributes, ReactNode } from 'react'
 
 export function Card({
   children,
@@ -46,31 +39,12 @@ export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
   )
 }
 
-export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return (
-    <textarea
-      {...props}
-      className={`w-full rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-1.5 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent)] ${props.className ?? ''}`}
-    />
-  )
-}
-
-export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
-  return (
-    <select
-      {...props}
-      className={`w-full rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-1.5 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent)] ${props.className ?? ''}`}
-    />
-  )
-}
-
-export function Badge({ children, tone = 'neutral' }: { children: ReactNode; tone?: 'neutral' | 'good' | 'critical' | 'warning' | 'accent' }) {
+export function Badge({ children, tone = 'neutral' }: { children: ReactNode; tone?: 'neutral' | 'good' | 'critical' | 'warning' }) {
   const tones: Record<string, string> = {
     neutral: 'bg-[var(--surface-2)] text-[var(--text-secondary)] border-[var(--border)]',
     good: 'bg-[var(--good)]/10 text-[var(--good-text)] border-[var(--good)]/30',
     critical: 'bg-[var(--critical)]/10 text-[var(--critical)] border-[var(--critical)]/30',
     warning: 'bg-[var(--warning)]/15 text-[#8a5a00] border-[var(--warning)]/40',
-    accent: 'bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]/30',
   }
   return (
     <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${tones[tone]}`}>

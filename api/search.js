@@ -1,12 +1,6 @@
 import { searchSymbols } from './_lib/yahoo.js'
-import { isAuthenticated } from './_lib/auth.js'
 
 export default async function handler(req, res) {
-  if (!isAuthenticated(req)) {
-    res.status(401).json({ error: 'Nicht angemeldet.' })
-    return
-  }
-
   const query = req.query?.q ?? new URL(req.url, 'http://localhost').searchParams.get('q')
 
   if (!query || query.trim().length < 2) {

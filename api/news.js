@@ -1,12 +1,6 @@
 import { fetchNews } from './_lib/yahoo.js'
-import { isAuthenticated } from './_lib/auth.js'
 
 export default async function handler(req, res) {
-  if (!isAuthenticated(req)) {
-    res.status(401).json({ error: 'Nicht angemeldet.' })
-    return
-  }
-
   const symbol = req.query?.symbol ?? new URL(req.url, 'http://localhost').searchParams.get('symbol')
 
   if (!symbol) {
