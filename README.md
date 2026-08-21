@@ -29,17 +29,22 @@ neueste Schlagzeile als Vorschau.
   und Take-Profit-Linien, dazu Setup-Richtung (Long/Short), Chance-Risiko-Verhältnis
   (CRV).
 - **Indikatoren, aufgeteilt in kurzfristig (Trading), mittelfristig (Swing-Trading)
-  und langfristig (Investment)**: 15 klassische technische Indikatoren, jeder einzeln
-  mit Wert, Bullisch/Bearisch/Neutral-Einstufung und kurzer Begründung (inkl.
-  Crossover-Frische, Divergenzen, Bollinger-Squeeze – siehe Methodik unten), gruppiert
-  in drei Blöcke mit je eigenem Gesamtfazit. Auf einen Indikator tippen öffnet direkt
-  darunter seinen eigenen Chart (Kurslinie mit Overlay, eigenständiger
-  Oszillator-Bereich oder Volumen-Histogramm) – so lässt sich nachvollziehen, worauf
-  die Einstufung tatsächlich beruht.
-- **Kursziele (1/3/6/12 Monate)**: Tabelle mit Zielkurs + Unsicherheitszone für jeden
-  der 15 Indikatoren einzeln, mit je einer eigenen "Gesamt"-Zeile für die drei
-  Indikator-Gruppen. Alle vier Horizonte zeigen spürbar unterschiedliche, monoton
-  wachsende Zielkurse statt eines nach kurzer Zeit eingefrorenen Werts.
+  und langfristig (Investment)**: 15 klassische technische Indikatoren, jeder als
+  eigene Karte mit Wert, Bullisch/Bearisch/Neutral-Einstufung, kurzer Begründung
+  (inkl. Crossover-Frische, Divergenzen, Bollinger-Squeeze – siehe Methodik unten)
+  und seinem Chart (Kurslinie mit Overlay, eigenständiger Oszillator-Bereich oder
+  Volumen-Histogramm) **dauerhaft sichtbar direkt darunter** – kein Antippen nötig,
+  um nachzuvollziehen, worauf die Einstufung tatsächlich beruht. Gruppiert in drei
+  Blöcke mit je eigenem Gesamtfazit.
+- **Kursziele**: Tabelle mit Zielkurs + Unsicherheitszone, mit je einer eigenen
+  "Gesamt"-Zeile für die drei Indikator-Gruppen. Jede Gruppe zeigt dabei nur die
+  Zeiträume, für die sie tatsächlich aussagekräftig ist – kurzfristige (Tages-)
+  Indikatoren nur 1 Woche, mittelfristige 1 und 3 Monate, langfristige 3/6/12
+  Monate; für alles darüber hinaus wird bewusst keine Zahl gezeigt statt einer
+  vorgetäuschten Genauigkeit. Innerhalb der gezeigten Horizonte sind die Zielkurse
+  spürbar unterschiedlich und monoton wachsend statt eines nach kurzer Zeit
+  eingefrorenen Werts. ATR (nicht richtungsgebend) und Indikatoren ohne verfügbare
+  Daten tauchen in der Tabelle gar nicht erst auf.
 - **Zukunftsprojektion**: wählbarer Horizont (7/14/30/60/90 Tage), gestrichelte
   Projektionslinie mit gefülltem Unsicherheitsband direkt im Chart, plus Zielwert ±
   Band als Zahl.
@@ -231,16 +236,28 @@ Kennzahlen – **kein KI-/ML-Modell, keine Gewichtung nach historischer Trefferq
 und keine Anlageberatung.** Einzelne Indikatoren widersprechen sich in der Praxis
 häufig; das Gesamtfazit fasst das lediglich numerisch zusammen.
 
-### Kursziele für 1/3/6/12 Monate – je Indikator und gesamt (wichtig)
+### Kursziele – je Indikator und gesamt, nur für aussagekräftige Zeiträume (wichtig)
 
 `src/services/priceTargets.ts` (`buildPriceTargets`) übersetzt die **stetige
 Signalstärke** jedes Indikators aus dem Indikatoren-Panel (`strength`, -1..+1 – nicht
 nur die 3-stufige Bullisch/Bearisch/Neutral-Einstufung) in eine Kurszielzone
-(Zielkurs + Unsicherheitsband) für vier feste Horizonte: 1, 3, 6 und 12 Monate.
-Angezeigt in der Tabelle **"Kursziele (1/3/6/12 Monate)"**, getrennt nach den drei
-Indikator-Gruppen kurz-/mittel-/langfristig (siehe oben), jeweils mit einer eigenen
-"Gesamt"-Zeile plus einer Zeile je Einzelindikator dieser Gruppe.
+(Zielkurs + Unsicherheitsband). Angezeigt in der Tabelle **"Kursziele"**, getrennt
+nach den drei Indikator-Gruppen kurz-/mittel-/langfristig (siehe oben), jeweils mit
+einer eigenen "Gesamt"-Zeile plus einer Zeile je Einzelindikator dieser Gruppe.
 
+- **Zwei Filter, bevor überhaupt eine Zahl entsteht**:
+  1. Nur Indikatoren mit `directional === true` bekommen eine Zeile – ATR liefert
+     bewusst nie eine Richtung, und Volumen-Indikatoren ohne verfügbare
+     Handelsvolumen-Daten (z.B. bei Devisen) haben schlicht keinen Wert, aus dem sich
+     ein Kursziel ableiten ließe. Beide tauchen in der Tabelle deshalb gar nicht auf,
+     statt einer erfundenen Zahl.
+  2. Jede Horizont-Gruppe bekommt nur die Zeiträume, für die sie tatsächlich
+     aussagekräftig ist: **kurzfristig (Trading) nur 1 Woche**, **mittelfristig
+     (Swing-Trading) 1 und 3 Monate**, **langfristig (Investment) 3, 6 und 12
+     Monate**. Ein Indikator, der nicht mehr als ein paar Tage vorausschauen kann
+     (z.B. RSI, Parabolic SAR), bekommt also nur eine Zahl bei 1 Woche und sonst
+     keine – eine 12-Monats-Zahl daraus abzuleiten würde eine Genauigkeit vortäuschen,
+     die die Kennzahl nicht hat.
 - **Signalstärke statt nur 3 Stufen**: jeder Indikator berechnet zusätzlich zu seinem
   Rating, *wie weit* er von seiner Schwelle entfernt ist (z.B. wie weit RSI unter 30
   liegt, wie groß der SMA5/SMA20-Abstand ist) – normiert auf ein Vielfaches der
@@ -253,10 +270,9 @@ Indikator-Gruppen kurz-/mittel-/langfristig (siehe oben), jeweils mit einer eige
   ausschlugen.
 - **Tägliche Drift-Annahme**: eine maximale Signalstärke (±1) entspricht der Annahme,
   der Kurs drifte täglich um die Hälfte seiner Tages-Volatilität in diese Richtung,
-  schwächere Signale entsprechend weniger; Neutral (und Indikatoren ohne verfügbare
-  Daten, z.B. Volumen-Indikatoren bei Devisen) ergeben Drift 0 – das Kursziel bleibt
-  dort exakt beim aktuellen Kurs, deshalb zeigen alle neutral eingestuften Indikatoren
-  denselben (unveränderten) Zielkurs.
+  schwächere Signale entsprechend weniger; Neutral ergibt Drift 0 – das Kursziel
+  bleibt dort exakt beim aktuellen Kurs, deshalb zeigen alle neutral eingestuften
+  Indikatoren denselben (unveränderten) Zielkurs.
 - **Fortschreibung mit eigener, langsamerer Dämpfung**: gedämpfte Trendfortschreibung
   (Holt-Damped-Trend, `src/services/damping.ts`) wie bei der Zukunftsprojektion, aber
   mit einer eigenen Halbwertszeit von 90 Tagen statt der ~7 Tage der 7-90-Tage-
@@ -264,12 +280,11 @@ Indikator-Gruppen kurz-/mittel-/langfristig (siehe oben), jeweils mit einer eige
   die Drift nach spätestens ~2 Monaten bereits vollständig ausgeklungen – bei einem
   bis zu 12 Monate reichenden Horizont waren die 3-/6-/12-Monats-Zielkurse dadurch
   praktisch identisch (nur das Unsicherheitsband wuchs noch weiter). Mit der
-  90-Tage-Halbwertszeit sind stattdessen alle vier Horizonte spürbar und monoton
-  unterschiedlich (bei voller Signalstärke ±1 z.B. ~18/43/68/90 % der asymptotischen
-  Maximalbewegung nach 1/3/6/12 Monaten).
-- **Unsicherheitszone**: wächst weiterhin mit der Wurzel der Zeit – die Bandbreite der
-  Horizonte 1/3/6/12 Monate unterscheidet sich also zusätzlich zum jetzt ebenfalls
-  unterschiedlichen Zielkurs selbst.
+  90-Tage-Halbwertszeit sind stattdessen alle Horizonte einer Gruppe spürbar und
+  monoton unterschiedlich (bei voller Signalstärke ±1 z.B. ~18/43/68/90 % der
+  asymptotischen Maximalbewegung nach 1/3/6/12 Monaten).
+- **Unsicherheitszone**: wächst weiterhin mit der Wurzel der Zeit – die Bandbreite
+  unterscheidet sich also zusätzlich zum ebenfalls unterschiedlichen Zielkurs selbst.
 - **Drei "Gesamt"-Zeilen**: je eine für die kurz-, mittel- und langfristige Gruppe,
   jeweils aus dem Durchschnitts-`strength`-Wert der richtungsgebenden Indikatoren
   dieser Gruppe (`consensusShort.avgStrength` / `consensusMedium.avgStrength` /
@@ -368,11 +383,12 @@ src/
     PriceChart.tsx      Chart-Basis (Kurs, SMA 5/20, Bollinger, optional
                         Entry/SL/TP, optional Projektion+Band)
     StructureChart.tsx  Chart mit Fibonacci-Levels + nummerierten Elliott-Wellenpunkten
-    IndicatorPanelCard.tsx  15 Indikatoren in 3 Tiers (kurz-/mittel-/langfristig) +
-                            Tap-to-Expand-Zeile je Indikator
-    IndicatorMiniChart.tsx  Chart für genau einen angetippten Indikator
+    IndicatorPanelCard.tsx  15 Indikatoren in 3 Tiers (kurz-/mittel-/langfristig) als
+                            Card-Grid, Chart je Indikator dauerhaft sichtbar
+    IndicatorMiniChart.tsx  Chart für genau einen Indikator
                             (Kurs-Overlay/Oszillator/Volumen-Histogramm)
-    PriceTargetsCard.tsx  Kursziel-Tabelle je Indikator + je Tier gesamt (1/3/6/12 Monate)
+    PriceTargetsCard.tsx  Kursziel-Tabelle je Indikator + je Tier gesamt, Spalten
+                          variieren je Tier (1 Woche / 1+3 / 3+6+12 Monate)
     ChartLegend.tsx
     ui.tsx              Wiederverwendbare UI-Bausteine
   services/
@@ -384,7 +400,8 @@ src/
                       – reine Arithmetik
     indicatorPanel.ts  Bullisch/Bearisch/Neutral + Chart-Zeitreihe je Indikator,
                        Tier-Zuordnung kurz-/mittel-/langfristig, je Tier ein Gesamtfazit
-    priceTargets.ts     Kurszielzonen je Indikator + je Tier gesamt für 1/3/6/12 Monate
+    priceTargets.ts     Kurszielzonen je Indikator + je Tier gesamt, nur für die
+                        je Tier aussagekräftigen Zeiträume (1 Woche/1+3/3+6+12 Monate)
     damping.ts          Gedämpfte Trendfortschreibung (Holt-Damped-Trend)
     projection.ts        Zukunftsprojektion + Unsicherheitsband
     fibonacci.ts           Fibonacci-Retracement/-Extension-Levels
