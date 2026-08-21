@@ -3,6 +3,7 @@ import { formatCurrency, formatPercent } from '../../lib/format'
 import { formatRelativeTime } from '../../lib/time'
 import { Badge, Button, Card, SectionHeading } from '../ui'
 import { PriceChart } from './PriceChart'
+import { ChartLegend } from './ChartLegend'
 
 function ForecastTile({ label, value, change }: { label: string; value: string; change: number }) {
   const positive = change >= 0
@@ -23,6 +24,8 @@ export function SymbolPreview({
   snapshot,
   news,
   newsLoading,
+  isFavorite,
+  onToggleFavorite,
   onBack,
   onShowFull,
 }: {
@@ -31,6 +34,8 @@ export function SymbolPreview({
   snapshot: MarketSnapshot
   news: NewsItem[] | null
   newsLoading: boolean
+  isFavorite: boolean
+  onToggleFavorite: () => void
   onBack: () => void
   onShowFull: () => void
 }) {
@@ -44,7 +49,16 @@ export function SymbolPreview({
         ← Zurück zur Übersicht
       </Button>
 
-      <SectionHeading title={`${meta.name} (${symbol})`} subtitle={meta.unitLabel} />
+      <SectionHeading
+        title={`${meta.name} (${symbol})`}
+        subtitle={meta.unitLabel}
+        action={
+          <Button variant="ghost" onClick={onToggleFavorite} aria-label={isFavorite ? 'Von Watchlist entfernen' : 'Zur Watchlist hinzufügen'}>
+            <span className={isFavorite ? 'text-[var(--warning)]' : 'text-[var(--text-muted)]'}>{isFavorite ? '★' : '☆'}</span>{' '}
+            {isFavorite ? 'Auf Watchlist' : 'Zur Watchlist'}
+          </Button>
+        }
+      />
 
       {!quote ? (
         <Card className="text-sm text-[var(--text-muted)]">Kursdaten werden geladen…</Card>
@@ -53,7 +67,7 @@ export function SymbolPreview({
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <div className="font-mono text-2xl font-semibold text-[var(--text-primary)]">
-                {formatCurrency(quote.price, meta.unitAbbrev)}
+                {formatCurrency(quote.price, meta.unitAbbrev, meta.pricePrefix)}
               </div>
               <Badge tone={quote.changePercent >= 0 ? 'good' : 'critical'}>{formatPercent(quote.changePercent)} heute</Badge>
             </div>
@@ -62,17 +76,18 @@ export function SymbolPreview({
           {forecast ? (
             <>
               <div className="mt-3">
-                <PriceChart forecast={forecast} unitAbbrev={meta.unitAbbrev} variant="simple" />
+                <PriceChart forecast={forecast} unitAbbrev={meta.unitAbbrev} pricePrefix={meta.pricePrefix} variant="simple" />
+                <ChartLegend variant="simple" />
               </div>
               <div className="mt-3 flex gap-2">
                 <ForecastTile
                   label="Prognose bis Handelsschluss heute"
-                  value={formatCurrency(forecast.endOfDayEstimate, meta.unitAbbrev)}
+                  value={formatCurrency(forecast.endOfDayEstimate, meta.unitAbbrev, meta.pricePrefix)}
                   change={((forecast.endOfDayEstimate - forecast.currentPrice) / forecast.currentPrice) * 100}
                 />
                 <ForecastTile
                   label="Prognose in 7 Tagen"
-                  value={formatCurrency(forecast.sevenDayEstimate, meta.unitAbbrev)}
+                  value={formatCurrency(forecast.sevenDayEstimate, meta.unitAbbrev, meta.pricePrefix)}
                   change={((forecast.sevenDayEstimate - forecast.currentPrice) / forecast.currentPrice) * 100}
                 />
               </div>
@@ -95,7 +110,7 @@ export function SymbolPreview({
             {!newsLoading && !latestHeadline && <p className="mt-1 text-sm text-[var(--text-muted)]">Keine aktuellen Schlagzeilen gefunden.</p>}
           </div>
 
-          <p className="mt-3 text-xs text-[var(--accent)]">Tippen für Chart mit Einstiegszone/SL/TP, alle Schlagzeilen & Zusammenfassung →</p>
+          <p className="mt-3 text-xs text-[var(--accent)]">Tippen für Chart mit Einstiegszone/SL/TP, Zeiträume, Kennzahlen & Zusammenfassung →</p>
         </Card>
       )}
     </div>

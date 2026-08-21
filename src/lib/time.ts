@@ -1,34 +1,3 @@
-import type { Weekday } from '../types'
-
-export const WEEKDAY_LABELS: Record<Weekday, string> = {
-  0: 'Mo',
-  1: 'Di',
-  2: 'Mi',
-  3: 'Do',
-  4: 'Fr',
-  5: 'Sa',
-  6: 'So',
-}
-
-export const WEEKDAY_LABELS_LONG: Record<Weekday, string> = {
-  0: 'Montag',
-  1: 'Dienstag',
-  2: 'Mittwoch',
-  3: 'Donnerstag',
-  4: 'Freitag',
-  5: 'Samstag',
-  6: 'Sonntag',
-}
-
-/** JS getDay() liefert 0=Sonntag..6=Samstag, wir wollen 0=Montag..6=Sonntag. */
-export function toAppWeekday(jsDay: number): Weekday {
-  return ((jsDay + 6) % 7) as Weekday
-}
-
-export function isoDate(date: Date): string {
-  return date.toISOString().slice(0, 10)
-}
-
 export function formatRelativeTime(timestampMs: number, now: number = Date.now()): string {
   if (!timestampMs) return ''
   const diffMinutes = Math.max(0, Math.round((now - timestampMs) / 60000))

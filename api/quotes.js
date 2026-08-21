@@ -1,7 +1,10 @@
 import { fetchQuotes } from './_lib/yahoo.js'
 
 export default async function handler(req, res) {
-  const symbolsParam = req.query?.symbols ?? new URL(req.url, 'http://localhost').searchParams.get('symbols')
+  const url = new URL(req.url, 'http://localhost')
+  const symbolsParam = req.query?.symbols ?? url.searchParams.get('symbols')
+  const interval = req.query?.interval ?? url.searchParams.get('interval') ?? undefined
+  const range = req.query?.range ?? url.searchParams.get('range') ?? undefined
   const symbols = (symbolsParam ?? '')
     .split(',')
     .map((s) => s.trim())
@@ -13,8 +16,8 @@ export default async function handler(req, res) {
   }
 
   try {
-    const quotes = await fetchQuotes(symbols)
-    res.setHeader('Cache-Control', 's-maxage=1800, stale-while-revalidate=600')
+    const quotes = await fetchQuotes(symbols, { interval, range })
+    res.setHeader('Cache-Control', 's-maxage=900, stale-while-revalidate=300')
     res.status(200).json({ quotes })
   } catch (err) {
     res.status(502).json({ error: err instanceof Error ? err.message : 'Unbekannter Fehler beim Kursabruf.' })

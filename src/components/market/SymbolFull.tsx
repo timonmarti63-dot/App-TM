@@ -1,28 +1,13 @@
-import type { MarketSnapshot, NewsItem, WatchlistSymbol } from '../../types'
-import { formatCurrency, formatPercent, formatRiskReward } from '../../lib/format'
+import { useState } from 'react'
+import type { NewsItem, WatchlistSymbol } from '../../types'
+import { formatCurrency, formatPercent, formatRiskReward, formatVolume } from '../../lib/format'
 import { buildHeadlineSummary, filterRecentNews } from '../../lib/report'
 import { formatRelativeTime } from '../../lib/time'
+import { TIMEFRAMES, DEFAULT_TIMEFRAME } from '../../services/marketData'
+import { useSymbolTimeframeData } from '../../hooks/useSymbolTimeframeData'
 import { Badge, Button, Card, SectionHeading } from '../ui'
 import { PriceChart } from './PriceChart'
-
-function ChartLegend() {
-  const items: { label: string; swatch: string }[] = [
-    { label: 'Kurs', swatch: 'bg-[var(--accent)]' },
-    { label: 'Einstiegszone', swatch: 'bg-[var(--accent)]/25' },
-    { label: 'Stop-Loss', swatch: 'bg-[var(--critical)]' },
-    { label: 'Take-Profit', swatch: 'bg-[var(--good)]' },
-  ]
-  return (
-    <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-[var(--text-muted)]">
-      {items.map((item) => (
-        <span key={item.label} className="flex items-center gap-1">
-          <span className={`h-2 w-2 rounded-full ${item.swatch}`} />
-          {item.label}
-        </span>
-      ))}
-    </div>
-  )
-}
+import { ChartLegend } from './ChartLegend'
 
 function TradeRow({ label, value, tone }: { label: string; value: string; tone?: 'good' | 'critical' }) {
   const color = tone === 'good' ? 'text-[var(--good-text)]' : tone === 'critical' ? 'text-[var(--critical)]' : 'text-[var(--text-primary)]'
@@ -37,22 +22,24 @@ function TradeRow({ label, value, tone }: { label: string; value: string; tone?:
 export function SymbolFull({
   symbol,
   meta,
-  snapshot,
   news,
   newsLoading,
   newsError,
+  isFavorite,
+  onToggleFavorite,
   onBack,
 }: {
   symbol: string
   meta: WatchlistSymbol
-  snapshot: MarketSnapshot
   news: NewsItem[] | null
   newsLoading: boolean
   newsError: string | null
+  isFavorite: boolean
+  onToggleFavorite: () => void
   onBack: () => void
 }) {
-  const quote = snapshot.quotes[symbol]
-  const forecast = snapshot.forecasts[symbol]
+  const [timeframe, setTimeframe] = useState(DEFAULT_TIMEFRAME)
+  const { quote, forecast, loading, error } = useSymbolTimeframeData(symbol, timeframe)
   const { news: recentNews, isFallback } = filterRecentNews(news ?? [])
 
   return (
@@ -61,23 +48,47 @@ export function SymbolFull({
         ← Zurück zur Kurzansicht
       </Button>
 
-      <SectionHeading title={`${meta.name} (${symbol})`} subtitle={meta.unitLabel} />
+      <SectionHeading
+        title={`${meta.name} (${symbol})`}
+        subtitle={meta.unitLabel}
+        action={
+          <Button variant="ghost" onClick={onToggleFavorite} aria-label={isFavorite ? 'Von Watchlist entfernen' : 'Zur Watchlist hinzufügen'}>
+            <span className={isFavorite ? 'text-[var(--warning)]' : 'text-[var(--text-muted)]'}>{isFavorite ? '★' : '☆'}</span>{' '}
+            {isFavorite ? 'Auf Watchlist' : 'Zur Watchlist'}
+          </Button>
+        }
+      />
+
+      {error && <Card className="mb-4 border-[var(--critical)]/40 text-sm text-[var(--critical)]">{error}</Card>}
 
       {quote && forecast && (
         <Card className="mb-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <div className="font-mono text-2xl font-semibold text-[var(--text-primary)]">
-                {formatCurrency(quote.price, meta.unitAbbrev)}
+                {formatCurrency(quote.price, meta.unitAbbrev, meta.pricePrefix)}
               </div>
               <Badge tone={quote.changePercent >= 0 ? 'good' : 'critical'}>{formatPercent(quote.changePercent)} heute</Badge>
             </div>
+            <div className="flex gap-1 rounded-lg bg-[var(--surface-2)] p-1">
+              {TIMEFRAMES.map((tf) => (
+                <button
+                  key={tf.label}
+                  onClick={() => setTimeframe(tf)}
+                  className={`cursor-pointer rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                    tf.label === timeframe.label ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-secondary)] hover:bg-[var(--surface-1)]'
+                  }`}
+                >
+                  {tf.label}
+                </button>
+              ))}
+            </div>
           </div>
 
-          <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-stretch">
+          <div className={`mt-4 flex flex-col gap-4 lg:flex-row lg:items-stretch ${loading ? 'opacity-50' : ''}`}>
             <div className="lg:w-3/5">
-              <PriceChart forecast={forecast} unitAbbrev={meta.unitAbbrev} variant="full" />
-              <ChartLegend />
+              <PriceChart forecast={forecast} unitAbbrev={meta.unitAbbrev} pricePrefix={meta.pricePrefix} variant="full" />
+              <ChartLegend variant="full" />
             </div>
             <div className="flex-1 rounded-lg bg-[var(--surface-2)] px-3 py-1">
               <div className="flex items-center justify-between py-1.5">
@@ -88,26 +99,49 @@ export function SymbolFull({
               </div>
               <TradeRow
                 label="Einstiegszone"
-                value={`${formatCurrency(forecast.entryLow, meta.unitAbbrev)} – ${formatCurrency(forecast.entryHigh)}`}
+                value={`${formatCurrency(forecast.entryLow, meta.unitAbbrev, meta.pricePrefix)} – ${formatCurrency(forecast.entryHigh, undefined, meta.pricePrefix)}`}
               />
-              <TradeRow label="Stop-Loss" value={formatCurrency(forecast.stopLoss, meta.unitAbbrev)} tone="critical" />
+              <TradeRow label="Stop-Loss" value={formatCurrency(forecast.stopLoss, meta.unitAbbrev, meta.pricePrefix)} tone="critical" />
               <TradeRow
                 label="Take-Profit heute"
-                value={`${formatCurrency(forecast.endOfDayEstimate, meta.unitAbbrev)} (${formatRiskReward(forecast.riskRewardEod)} CRV)`}
+                value={`${formatCurrency(forecast.endOfDayEstimate, meta.unitAbbrev, meta.pricePrefix)} (${formatRiskReward(forecast.riskRewardEod)} CRV)`}
                 tone="good"
               />
               <TradeRow
                 label="Take-Profit 7 Tage"
-                value={`${formatCurrency(forecast.sevenDayEstimate, meta.unitAbbrev)} (${formatRiskReward(forecast.riskRewardSevenDay)} CRV)`}
+                value={`${formatCurrency(forecast.sevenDayEstimate, meta.unitAbbrev, meta.pricePrefix)} (${formatRiskReward(forecast.riskRewardSevenDay)} CRV)`}
                 tone="good"
               />
             </div>
           </div>
 
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div className="rounded-lg bg-[var(--surface-2)] p-2 text-center">
+              <div className="text-[11px] text-[var(--text-muted)]">Tagesspanne</div>
+              <div className="font-mono text-xs text-[var(--text-primary)]">
+                {formatCurrency(quote.dayLow, undefined, meta.pricePrefix)} – {formatCurrency(quote.dayHigh, undefined, meta.pricePrefix)}
+              </div>
+            </div>
+            <div className="rounded-lg bg-[var(--surface-2)] p-2 text-center">
+              <div className="text-[11px] text-[var(--text-muted)]">52-Wochen-Spanne</div>
+              <div className="font-mono text-xs text-[var(--text-primary)]">
+                {formatCurrency(quote.fiftyTwoWeekLow, undefined, meta.pricePrefix)} – {formatCurrency(quote.fiftyTwoWeekHigh, undefined, meta.pricePrefix)}
+              </div>
+            </div>
+            <div className="rounded-lg bg-[var(--surface-2)] p-2 text-center">
+              <div className="text-[11px] text-[var(--text-muted)]">Volumen</div>
+              <div className="font-mono text-xs text-[var(--text-primary)]">{formatVolume(quote.volume)}</div>
+            </div>
+            <div className="rounded-lg bg-[var(--surface-2)] p-2 text-center">
+              <div className="text-[11px] text-[var(--text-muted)]">Zeitraum</div>
+              <div className="font-mono text-xs text-[var(--text-primary)]">{timeframe.label}</div>
+            </div>
+          </div>
+
           <p className="mt-3 text-xs text-[var(--text-muted)]">
             Einstiegszone, Stop-Loss und Chance-Risiko-Verhältnis (CRV) sind statistische Schätzungen aus Kurstrend
-            und jüngster Schwankungsbreite – keine Anlageberatung und keine Garantie für den tatsächlichen
-            Kursverlauf.
+            und Schwankungsbreite im gewählten Zeitraum – keine Anlageberatung und keine Garantie für den
+            tatsächlichen Kursverlauf. SMA 5/20 sind gleitende Durchschnitte über die letzten 5 bzw. 20 Kerzen.
           </p>
         </Card>
       )}

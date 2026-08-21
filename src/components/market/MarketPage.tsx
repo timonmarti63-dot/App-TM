@@ -1,23 +1,54 @@
 import { useState } from 'react'
 import { useMarketData } from '../../hooks/useMarketData'
 import { useSymbolNews } from '../../hooks/useSymbolNews'
-import { ALL_WATCHLIST, STOCK_WATCHLIST, COMMODITY_WATCHLIST } from '../../data/watchlist'
+import { useFavorites } from '../../hooks/useFavorites'
+import { ALL_WATCHLIST, STOCK_WATCHLIST, COMMODITY_WATCHLIST, CRYPTO_WATCHLIST, INDEX_WATCHLIST, FOREX_WATCHLIST, CATEGORY_META } from '../../data/watchlist'
+import type { WatchlistSymbol } from '../../types'
 import { Button, Card, SectionHeading } from '../ui'
 import { SymbolTable } from './SymbolTable'
 import { SymbolPreview } from './SymbolPreview'
 import { SymbolFull } from './SymbolFull'
+import { SymbolSearch } from './SymbolSearch'
 
 type View = 'list' | 'preview' | 'full'
 
+const CATEGORY_LISTS = [
+  { category: 'aktie' as const, list: STOCK_WATCHLIST },
+  { category: 'rohstoff' as const, list: COMMODITY_WATCHLIST },
+  { category: 'krypto' as const, list: CRYPTO_WATCHLIST },
+  { category: 'index' as const, list: INDEX_WATCHLIST },
+  { category: 'devise' as const, list: FOREX_WATCHLIST },
+]
+
 export function MarketPage() {
-  const { snapshot, loading, refresh } = useMarketData()
+  const { favorites, isFavorite, toggleFavorite, addFavorite } = useFavorites()
+  const { snapshot, loading, refresh } = useMarketData(favorites)
   const [view, setView] = useState<View>('list')
   const [activeSymbol, setActiveSymbol] = useState<string | null>(null)
+  const [activeMeta, setActiveMeta] = useState<WatchlistSymbol | null>(null)
   const news = useSymbolNews(activeSymbol)
 
-  const meta = activeSymbol ? ALL_WATCHLIST.find((w) => w.symbol === activeSymbol) : undefined
+  function openSymbol(meta: WatchlistSymbol) {
+    setActiveSymbol(meta.symbol)
+    setActiveMeta(meta)
+    setView('preview')
+  }
+
+  /** Suchtreffer, die noch in keiner Liste stehen, automatisch merken – sonst bliebe die
+   * Kurzansicht dauerhaft im Ladezustand, weil das Symbol nicht Teil des Stunden-Batches ist. */
+  function handleSearchSelect(meta: WatchlistSymbol) {
+    const alreadyTracked = ALL_WATCHLIST.some((w) => w.symbol === meta.symbol) || favorites.some((f) => f.symbol === meta.symbol)
+    if (!alreadyTracked) addFavorite(meta)
+    openSymbol(meta)
+  }
+
+  const meta = activeMeta ?? (activeSymbol ? ALL_WATCHLIST.find((w) => w.symbol === activeSymbol) : undefined)
 
   if (view !== 'list' && activeSymbol && meta) {
+    const favProps = {
+      isFavorite: isFavorite(activeSymbol),
+      onToggleFavorite: () => toggleFavorite(meta),
+    }
     if (view === 'preview') {
       return (
         <SymbolPreview
@@ -28,6 +59,7 @@ export function MarketPage() {
           newsLoading={news.loading}
           onBack={() => setView('list')}
           onShowFull={() => setView('full')}
+          {...favProps}
         />
       )
     }
@@ -35,11 +67,11 @@ export function MarketPage() {
       <SymbolFull
         symbol={activeSymbol}
         meta={meta}
-        snapshot={snapshot}
         news={news.items}
         newsLoading={news.loading}
         newsError={news.error}
         onBack={() => setView('preview')}
+        {...favProps}
       />
     )
   }
@@ -47,8 +79,8 @@ export function MarketPage() {
   return (
     <div>
       <SectionHeading
-        title="Marktanalyst"
-        subtitle="Top 5 Aktien & Rohstoffe – auf eine Zeile tippen für Chart, Prognose und Schlagzeile"
+        title="Marktübersicht"
+        subtitle="Auf eine Zeile tippen für Chart, Prognose und Schlagzeile"
         action={
           <div className="flex items-center gap-2">
             {snapshot.fetchedAt && (
@@ -69,6 +101,8 @@ export function MarketPage() {
         Finanzanalyse durch Menschen, keine Empfehlung und keine Garantie für den tatsächlichen Kursverlauf.
       </Card>
 
+      <SymbolSearch onSelect={handleSearchSelect} />
+
       {snapshot.error && (
         <Card className="mb-4 border-[var(--critical)]/40 text-sm text-[var(--critical)]">{snapshot.error}</Card>
       )}
@@ -77,26 +111,31 @@ export function MarketPage() {
       )}
 
       <div className="flex flex-col gap-8">
-        <SymbolTable
-          title="Aktien"
-          subtitle="Top 5 Tagesgewinner aus der Beobachtungsliste"
-          watchlist={STOCK_WATCHLIST}
-          snapshot={snapshot}
-          onSelect={(symbol) => {
-            setActiveSymbol(symbol)
-            setView('preview')
-          }}
-        />
-        <SymbolTable
-          title="Rohstoffe"
-          subtitle="Top 5 Tagesgewinner – echte Terminkontrakt-Preise (Gold, Silber, Öl, Erdgas, Kupfer, Platin)"
-          watchlist={COMMODITY_WATCHLIST}
-          snapshot={snapshot}
-          onSelect={(symbol) => {
-            setActiveSymbol(symbol)
-            setView('preview')
-          }}
-        />
+        {favorites.length > 0 && (
+          <SymbolTable
+            title="Meine Watchlist"
+            subtitle="Deine gemerkten Symbole"
+            watchlist={favorites}
+            snapshot={snapshot}
+            showAll
+            isFavorite={isFavorite}
+            onToggleFavorite={toggleFavorite}
+            onSelect={(symbol) => openSymbol(favorites.find((f) => f.symbol === symbol) ?? favorites[0])}
+          />
+        )}
+
+        {CATEGORY_LISTS.map(({ category, list }) => (
+          <SymbolTable
+            key={category}
+            title={CATEGORY_META[category].title}
+            subtitle={CATEGORY_META[category].subtitle}
+            watchlist={list}
+            snapshot={snapshot}
+            isFavorite={isFavorite}
+            onToggleFavorite={toggleFavorite}
+            onSelect={(symbol) => openSymbol(list.find((w) => w.symbol === symbol) ?? list[0])}
+          />
+        ))}
       </div>
     </div>
   )

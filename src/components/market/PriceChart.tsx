@@ -4,14 +4,16 @@ import type { Forecast } from '../../types'
 export function PriceChart({
   forecast,
   unitAbbrev,
+  pricePrefix = '$',
   variant = 'full',
 }: {
   forecast: Forecast
   unitAbbrev: string
+  pricePrefix?: string
   variant?: 'simple' | 'full'
 }) {
-  const { recentCloses, entryLow, entryHigh, stopLoss, endOfDayEstimate, sevenDayEstimate } = forecast
-  const data = recentCloses.map((close, i) => ({ i, close }))
+  const { recentCloses, sma5, sma20, entryLow, entryHigh, stopLoss, endOfDayEstimate, sevenDayEstimate } = forecast
+  const data = recentCloses.map((close, i) => ({ i, close, sma5: sma5[i] ?? null, sma20: sma20[i] ?? null }))
 
   const allValues = variant === 'full' ? [...recentCloses, entryLow, entryHigh, stopLoss, endOfDayEstimate, sevenDayEstimate] : recentCloses
   const min = Math.min(...allValues)
@@ -19,13 +21,16 @@ export function PriceChart({
   const pad = (max - min) * 0.12 || Math.abs(min) * 0.01 || 1
   const domain: [number, number] = [min - pad, max + pad]
 
+  const fmt = (value: number) =>
+    `${pricePrefix}${value.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}${unitAbbrev ? ` ${unitAbbrev}` : ''}`
+
   return (
     <div className="h-40 w-full">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 6, right: 8, bottom: 6, left: 8 }}>
           <YAxis domain={domain} hide />
           <Tooltip
-            formatter={(value) => [`$${Number(value).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${unitAbbrev}`, 'Kurs']}
+            formatter={(value, name) => [fmt(Number(value)), name === 'close' ? 'Kurs' : name === 'sma5' ? 'SMA 5' : 'SMA 20']}
             labelFormatter={() => ''}
             contentStyle={{
               background: 'var(--surface-2)',
@@ -45,6 +50,8 @@ export function PriceChart({
             </>
           )}
 
+          <Line type="monotone" dataKey="sma20" stroke="var(--sma20)" strokeWidth={1.5} dot={false} isAnimationActive={false} />
+          <Line type="monotone" dataKey="sma5" stroke="var(--sma5)" strokeWidth={1.5} dot={false} isAnimationActive={false} />
           <Line type="monotone" dataKey="close" stroke="var(--accent)" strokeWidth={2} dot={false} isAnimationActive={false} />
         </LineChart>
       </ResponsiveContainer>

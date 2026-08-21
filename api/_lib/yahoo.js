@@ -2,17 +2,19 @@ const CHART_URL = 'https://query2.finance.yahoo.com/v8/finance/chart/'
 const SEARCH_URL = 'https://query1.finance.yahoo.com/v1/finance/search'
 const USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36'
-const CONCURRENCY = 6
+const CONCURRENCY = 8
+const MAX_SERIES_POINTS = 260
 
 /**
  * Undokumentierte, aber keyless öffentliche Yahoo-Finance-Chart-API. Liefert in einem
- * Aufruf sowohl den aktuellen Kurs (meta) als auch stündliche Kurshistorie (indicators) –
- * das deckt Ranking UND Trend-Prognose gleichzeitig ab. Da der Aufruf server-seitig
- * passiert (diese Funktion läuft als Vercel-Function bzw. Vite-Dev-Middleware, nie im
- * Browser), spielt fehlendes CORS auf Yahoo-Seite keine Rolle.
+ * Aufruf sowohl den aktuellen Kurs (meta) als auch Kurshistorie (indicators) im
+ * gewünschten Zeitraster – das deckt Ranking, Trend-Prognose UND wählbare Zeiträume
+ * gleichzeitig ab. Da der Aufruf server-seitig passiert (diese Funktion läuft als
+ * Vercel-Function bzw. Vite-Dev-Middleware, nie im Browser), spielt fehlendes CORS
+ * auf Yahoo-Seite keine Rolle.
  */
-async function fetchSymbol(symbol) {
-  const url = `${CHART_URL}${encodeURIComponent(symbol)}?interval=1h&range=5d`
+async function fetchSymbol(symbol, { interval = '1h', range = '5d' } = {}) {
+  const url = `${CHART_URL}${encodeURIComponent(symbol)}?interval=${interval}&range=${range}`
   const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' } })
   if (!res.ok) throw new Error(`Yahoo Finance HTTP ${res.status} für ${symbol}`)
   const payload = await res.json()
@@ -23,12 +25,20 @@ async function fetchSymbol(symbol) {
 
   const meta = result.meta ?? {}
   const price = meta.regularMarketPrice
-  const previousClose = meta.previousClose
   const timestamps = result.timestamp ?? []
   const quote = result.indicators?.quote?.[0] ?? {}
   const closesRaw = quote.close ?? []
   const highsRaw = quote.high ?? []
   const lowsRaw = quote.low ?? []
+
+  // Bei nicht-intraday Intervallen (z.B. 1d/1wk) liefert Yahoo kein meta.previousClose –
+  // dann die vorletzte Kerze des Zeitraums selbst als Vergleichswert nehmen (ergibt die
+  // Veränderung über eine Kerze des gewählten Rasters, nicht zwingend "heute").
+  let previousClose = meta.previousClose
+  if (typeof previousClose !== 'number' && closesRaw.length >= 2) {
+    const prev = closesRaw[closesRaw.length - 2]
+    if (typeof prev === 'number') previousClose = prev
+  }
 
   if (typeof price !== 'number' || typeof previousClose !== 'number') {
     throw new Error(`Unvollständige Kursdaten für ${symbol}`)
@@ -49,7 +59,12 @@ async function fetchSymbol(symbol) {
     previousClose,
     changePercent: ((price - previousClose) / previousClose) * 100,
     timestamp: (meta.regularMarketTime ?? Math.floor(Date.now() / 1000)) * 1000,
-    series: series.slice(-30),
+    dayHigh: meta.regularMarketDayHigh ?? price,
+    dayLow: meta.regularMarketDayLow ?? price,
+    fiftyTwoWeekHigh: meta.fiftyTwoWeekHigh ?? price,
+    fiftyTwoWeekLow: meta.fiftyTwoWeekLow ?? price,
+    volume: meta.regularMarketVolume ?? 0,
+    series: series.slice(-MAX_SERIES_POINTS),
   }
 }
 
@@ -70,8 +85,8 @@ async function mapWithConcurrency(items, limit, fn) {
   return results
 }
 
-export async function fetchQuotes(symbols) {
-  const results = await mapWithConcurrency(symbols, CONCURRENCY, fetchSymbol)
+export async function fetchQuotes(symbols, params) {
+  const results = await mapWithConcurrency(symbols, CONCURRENCY, (s) => fetchSymbol(s, params))
   const quotes = {}
   for (const r of results) {
     if (r && !r.error) quotes[r.symbol] = r
@@ -97,6 +112,24 @@ export async function fetchNews(symbol, count = 8) {
       publisher: n.publisher ?? 'Unbekannte Quelle',
       link: n.link,
       publishedAt: (n.providerPublishTime ?? 0) * 1000,
+    }))
+    .slice(0, count)
+}
+
+/** Freitextsuche nach Symbolen (Firmenname, Ticker, ...) über dieselbe Such-API. */
+export async function searchSymbols(query, count = 8) {
+  const url = `${SEARCH_URL}?q=${encodeURIComponent(query)}&quotesCount=${count}&newsCount=0`
+  const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' } })
+  if (!res.ok) throw new Error(`Yahoo-Suche HTTP ${res.status}`)
+  const payload = await res.json()
+  const items = payload?.quotes ?? []
+  return items
+    .filter((q) => q.symbol && (q.shortname || q.longname))
+    .map((q) => ({
+      symbol: q.symbol,
+      name: q.shortname ?? q.longname ?? q.symbol,
+      exchange: q.exchange ?? '',
+      quoteType: q.quoteType ?? '',
     }))
     .slice(0, count)
 }

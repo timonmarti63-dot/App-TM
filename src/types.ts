@@ -1,28 +1,4 @@
-export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6 // 0 = Montag ... 6 = Sonntag
-
-export interface TimetableEntry {
-  id: string
-  title: string
-  startTime: string // "HH:MM"
-  endTime?: string
-  weekdays: Weekday[] // aktiv an diesen Wochentagen (wiederkehrend)
-  specificDate?: string // ISO yyyy-mm-dd, falls einmaliger Termin statt wiederkehrend
-  notes?: string
-  completedDates: Record<string, boolean> // ISO Datum -> erledigt
-}
-
-export type VentureStatus = 'idee' | 'aufbau' | 'aktiv' | 'pausiert' | 'beendet'
-
-export interface Venture {
-  id: string
-  name: string
-  status: VentureStatus
-  notes: string
-  createdAt: string
-  updatedAt: string
-}
-
-export type MarketCategory = 'aktie' | 'rohstoff'
+export type MarketCategory = 'aktie' | 'rohstoff' | 'krypto' | 'index' | 'devise'
 
 export interface WatchlistSymbol {
   symbol: string
@@ -30,6 +6,7 @@ export interface WatchlistSymbol {
   category: MarketCategory
   unitLabel: string // z.B. "US-Dollar je Feinunze"
   unitAbbrev: string // z.B. "/oz"
+  pricePrefix: string // z.B. "$", oder "" für Indexpunkte/Wechselkurse
 }
 
 export interface Quote {
@@ -38,6 +15,11 @@ export interface Quote {
   previousClose: number
   changePercent: number
   timestamp: number
+  dayHigh: number
+  dayLow: number
+  fiftyTwoWeekHigh: number
+  fiftyTwoWeekLow: number
+  volume: number
 }
 
 export type TradeDirection = 'long' | 'short'
@@ -50,6 +32,8 @@ export interface Forecast {
   sevenDayEstimate: number
   computedAt: number
   recentCloses: number[]
+  sma5: (number | null)[]
+  sma20: (number | null)[]
   direction: TradeDirection
   entryLow: number
   entryHigh: number
@@ -70,4 +54,11 @@ export interface MarketSnapshot {
   forecasts: Record<string, Forecast>
   fetchedAt: number | null
   error: string | null
+}
+
+export interface SearchResult {
+  symbol: string
+  name: string
+  exchange: string
+  quoteType: string
 }

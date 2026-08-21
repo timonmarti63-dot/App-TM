@@ -16,6 +16,8 @@
   --good-text: #006300;
   --critical: #d03b3b;
   --warning: #fab219;
+  --sma5: #eb6834;
+  --sma20: #4a3aa7;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -35,6 +37,8 @@
     --good-text: #0ca30c;
     --critical: #e66767;
     --warning: #fab219;
+    --sma5: #d95926;
+    --sma20: #9085e9;
   }
 }
 
@@ -54,6 +58,8 @@
   --good-text: #0ca30c;
   --critical: #e66767;
   --warning: #fab219;
+  --sma5: #d95926;
+  --sma20: #9085e9;
 }
 
 html,
