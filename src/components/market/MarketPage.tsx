@@ -35,7 +35,7 @@ export function MarketPage() {
   }
 
   /** Suchtreffer, die noch in keiner Liste stehen, automatisch merken – sonst bliebe die
-   * Kurzansicht dauerhaft im Ladezustand, weil das Symbol nicht Teil des Stunden-Batches ist. */
+   * Kurzansicht dauerhaft im Ladezustand, weil das Symbol nicht Teil des Auto-Refresh-Batches ist. */
   function handleSearchSelect(meta: WatchlistSymbol) {
     const alreadyTracked = ALL_WATCHLIST.some((w) => w.symbol === meta.symbol) || favorites.some((f) => f.symbol === meta.symbol)
     if (!alreadyTracked) addFavorite(meta)

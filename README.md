@@ -57,7 +57,8 @@ neueste Schlagzeile als Vorschau.
 - Alle Schlagzeilen der letzten 48 Stunden mit Original-Link, plus eine automatisch
   aus den Schlagzeilen-Titeln zusammengestellte deutsche Kurzfassung.
 
-Aktualisiert sich automatisch stündlich. Watchlist und Favoriten liegen lokal im
+Aktualisiert sich automatisch einmal pro Minute, solange die Seite geöffnet ist –
+Marktdaten bleiben so laufend aktuell. Watchlist und Favoriten liegen lokal im
 `localStorage` deines Browsers.
 
 ## Setup
@@ -103,7 +104,7 @@ reines statisches Hosting (z.B. GitHub Pages) reicht dafür **nicht** aus, weil 
 
 ### Beobachtungsliste statt "ganzer Markt"
 
-Auch ohne Key ist es nicht praktikabel, stündlich tausende Symbole abzufragen.
+Auch ohne Key ist es nicht praktikabel, minütlich tausende Symbole abzufragen.
 Deshalb arbeitet jede Kategorie mit einer festen Liste (`src/data/watchlist.ts`):
 ca. 25 liquide US-Standardwerte, 6 Rohstoff-Futures, 6 Kryptowährungen, 6 Indizes und
 6 Devisenpaare – jeweils die Top 5 nach Tagesveränderung. Über die Suche lässt sich

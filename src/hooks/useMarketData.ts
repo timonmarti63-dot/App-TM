@@ -5,7 +5,7 @@ import { DEFAULT_TIMEFRAME, fetchQuotesWithSeries, toQuote } from '../services/m
 import { computeForecast } from '../services/forecast'
 import { useLocalStorage } from './useLocalStorage'
 
-const REFRESH_INTERVAL_MS = 60 * 60 * 1000
+const REFRESH_INTERVAL_MS = 60 * 1000
 const TOP_N = 5
 
 const EMPTY_SNAPSHOT: MarketSnapshot = { quotes: {}, forecasts: {}, fetchedAt: null, error: null }
